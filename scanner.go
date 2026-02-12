@@ -179,8 +179,16 @@ func (s *Scanner) Next() Token {
 		s.advance()
 		return Token{Typ: TokRBrace, Str: "}"}
 	case '.':
-		// check if followed by digit (could be float like .5) — Joy doesn't use this, treat as period
 		s.advance()
+		// .s and similar: dot followed by letter is an atom
+		if !s.atEnd() && isAtomChar(s.peek()) && s.peek() != '.' {
+			start := s.pos
+			for !s.atEnd() && isAtomChar(s.peek()) {
+				s.advance()
+			}
+			name := "." + string(s.src[start:s.pos])
+			return Token{Typ: TokAtom, Str: name}
+		}
 		return Token{Typ: TokDot, Str: "."}
 	case ';':
 		s.advance()

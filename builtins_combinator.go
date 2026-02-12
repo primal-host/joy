@@ -133,24 +133,34 @@ func init() {
 	})
 
 	// ifte: [B] [T] [F] -> ... — if-then-else preserving stack
+	// Also supports: B [T] [F] -> ... (non-quotation condition)
 	register("ifte", func(m *Machine) {
 		m.NeedStack(3, "ifte")
 		fBranch := m.Pop()
 		tBranch := m.Pop()
 		test := m.Pop()
-		if test.Typ != TypeList || tBranch.Typ != TypeList || fBranch.Typ != TypeList {
-			joyErr("ifte: three quotations expected")
+		if fBranch.Typ != TypeList || tBranch.Typ != TypeList {
+			joyErr("ifte: two quotation branches expected")
 		}
-		// save stack, run test, restore stack, then branch
-		savedStack := make([]Value, len(m.Stack))
-		copy(savedStack, m.Stack)
-		m.Execute(test.List)
-		cond := m.Pop()
-		m.Stack = savedStack
-		if cond.IsTruthy() {
-			m.Execute(tBranch.List)
+		if test.Typ == TypeList {
+			// save stack, run test, restore stack, then branch
+			savedStack := make([]Value, len(m.Stack))
+			copy(savedStack, m.Stack)
+			m.Execute(test.List)
+			cond := m.Pop()
+			m.Stack = savedStack
+			if cond.IsTruthy() {
+				m.Execute(tBranch.List)
+			} else {
+				m.Execute(fBranch.List)
+			}
 		} else {
-			m.Execute(fBranch.List)
+			// non-quotation condition: use directly
+			if test.IsTruthy() {
+				m.Execute(tBranch.List)
+			} else {
+				m.Execute(fBranch.List)
+			}
 		}
 	})
 
