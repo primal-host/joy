@@ -598,5 +598,241 @@ func TestPlanDefineExample(t *testing.T) {
 	}
 }
 
+func TestTailrec(t *testing.T) {
+	tests := []struct {
+		input  string
+		expect string
+	}{
+		// countdown to 0
+		{"10 [0 =] [] [1 -] tailrec .", "0\n"},
+		// factorial via accumulator: 1 5 [0 =] [pop] [dup [*] dip pred] tailrec
+		{"1 5 [0 =] [pop] [dup [*] dip pred] tailrec .", "120\n"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			m := NewMachine()
+			out := captureOutput(func() {
+				if err := m.RunLine(tt.input); err != nil {
+					t.Fatalf("error: %v", err)
+				}
+			})
+			if out != tt.expect {
+				t.Errorf("got %q, want %q", out, tt.expect)
+			}
+		})
+	}
+}
+
+func TestLinrec(t *testing.T) {
+	tests := []struct {
+		input  string
+		expect string
+	}{
+		// factorial: 5 [null] [succ] [dup pred] [*] linrec
+		{"5 [null] [succ] [dup pred] [*] linrec .", "120\n"},
+		// factorial variant: 5 [0 =] [pop 1] [dup 1 -] [*] linrec
+		{"5 [0 =] [pop 1] [dup 1 -] [*] linrec .", "120\n"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			m := NewMachine()
+			out := captureOutput(func() {
+				if err := m.RunLine(tt.input); err != nil {
+					t.Fatalf("error: %v", err)
+				}
+			})
+			if out != tt.expect {
+				t.Errorf("got %q, want %q", out, tt.expect)
+			}
+		})
+	}
+}
+
+func TestBinrec(t *testing.T) {
+	tests := []struct {
+		input  string
+		expect string
+	}{
+		// fibonacci
+		{"7 [small] [] [pred dup pred] [+] binrec .", "13\n"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			m := NewMachine()
+			out := captureOutput(func() {
+				if err := m.RunLine(tt.input); err != nil {
+					t.Fatalf("error: %v", err)
+				}
+			})
+			if out != tt.expect {
+				t.Errorf("got %q, want %q", out, tt.expect)
+			}
+		})
+	}
+}
+
+func TestGenrec(t *testing.T) {
+	tests := []struct {
+		input  string
+		expect string
+	}{
+		// factorial: 5 [null] [succ] [dup pred] [i *] genrec
+		{"5 [null] [succ] [dup pred] [i *] genrec .", "120\n"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			m := NewMachine()
+			out := captureOutput(func() {
+				if err := m.RunLine(tt.input); err != nil {
+					t.Fatalf("error: %v", err)
+				}
+			})
+			if out != tt.expect {
+				t.Errorf("got %q, want %q", out, tt.expect)
+			}
+		})
+	}
+}
+
+func TestCondlinrec(t *testing.T) {
+	tests := []struct {
+		input  string
+		expect string
+	}{
+		// factorial: 5 [[[null] [succ]] [[dup pred] [*]]] condlinrec
+		{"5 [[[null] [succ]] [[dup pred] [*]]] condlinrec .", "120\n"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			m := NewMachine()
+			out := captureOutput(func() {
+				if err := m.RunLine(tt.input); err != nil {
+					t.Fatalf("error: %v", err)
+				}
+			})
+			if out != tt.expect {
+				t.Errorf("got %q, want %q", out, tt.expect)
+			}
+		})
+	}
+}
+
+func TestCondnestrec(t *testing.T) {
+	tests := []struct {
+		input  string
+		expect string
+	}{
+		// factorial
+		{"5 [[[null] [pop 1]] [[dup pred] [*]]] condnestrec .", "120\n"},
+		// McCarthy 91
+		{"99 [[[100 >] [10 -]] [[11 +] [] []]] condnestrec .", "91\n"},
+		{"100 [[[100 >] [10 -]] [[11 +] [] []]] condnestrec .", "91\n"},
+		{"101 [[[100 >] [10 -]] [[11 +] [] []]] condnestrec .", "91\n"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			m := NewMachine()
+			out := captureOutput(func() {
+				if err := m.RunLine(tt.input); err != nil {
+					t.Fatalf("error: %v", err)
+				}
+			})
+			if out != tt.expect {
+				t.Errorf("got %q, want %q", out, tt.expect)
+			}
+		})
+	}
+}
+
+func TestHideInEnd(t *testing.T) {
+	// Basic: hidden helper accessible inside IN, invisible outside
+	t.Run("basic", func(t *testing.T) {
+		m := NewMachine()
+		src := `HIDE helper == 2 * IN double == helper END`
+		if err := m.RunLine(src); err != nil {
+			t.Fatalf("error: %v", err)
+		}
+		out := captureOutput(func() {
+			if err := m.RunLine("5 double ."); err != nil {
+				t.Fatalf("error: %v", err)
+			}
+		})
+		if out != "10\n" {
+			t.Errorf("got %q, want %q", out, "10\n")
+		}
+		// hidden name should not be directly accessible
+		err := m.RunLine("5 helper .")
+		if err == nil {
+			t.Error("expected error accessing hidden name 'helper'")
+		}
+	})
+
+	// Nested HIDE
+	t.Run("nested", func(t *testing.T) {
+		m := NewMachine()
+		src := `HIDE
+			inner == 10 +
+		IN
+			HIDE
+				secret == 100 +
+			IN
+				add100 == secret
+			END
+			add10 == inner
+		END`
+		if err := m.RunLine(src); err != nil {
+			t.Fatalf("error: %v", err)
+		}
+		out := captureOutput(func() {
+			if err := m.RunLine("5 add10 ."); err != nil {
+				t.Fatalf("error: %v", err)
+			}
+		})
+		if out != "15\n" {
+			t.Errorf("add10: got %q, want %q", out, "15\n")
+		}
+		out = captureOutput(func() {
+			if err := m.RunLine("5 add100 ."); err != nil {
+				t.Fatalf("error: %v", err)
+			}
+		})
+		if out != "105\n" {
+			t.Errorf("add100: got %q, want %q", out, "105\n")
+		}
+		// inner and secret should be inaccessible
+		err := m.RunLine("5 inner .")
+		if err == nil {
+			t.Error("expected error accessing hidden name 'inner'")
+		}
+		err = m.RunLine("5 secret .")
+		if err == nil {
+			t.Error("expected error accessing hidden name 'secret'")
+		}
+	})
+
+	// HIDE inside DEFINE block
+	t.Run("hide_in_define", func(t *testing.T) {
+		m := NewMachine()
+		src := `DEFINE
+			HIDE
+				impl == dup *
+			IN
+				square == impl
+			END
+		.`
+		if err := m.RunLine(src); err != nil {
+			t.Fatalf("error: %v", err)
+		}
+		out := captureOutput(func() {
+			if err := m.RunLine("7 square ."); err != nil {
+				t.Fatalf("error: %v", err)
+			}
+		})
+		if out != "49\n" {
+			t.Errorf("got %q, want %q", out, "49\n")
+		}
+	})
+}
+
 // Silence unused import warning for fmt
 var _ = fmt.Sprint
