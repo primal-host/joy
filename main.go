@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/chzyer/readline"
 )
 
 func main() {
@@ -58,6 +60,54 @@ func main() {
 
 	// REPL mode
 	fmt.Println("Joy interpreter (Go) — type 'quit' to exit")
+
+	if readline.IsTerminal(int(os.Stdin.Fd())) {
+		replReadline(m)
+	} else {
+		replPipe(m)
+	}
+}
+
+func replReadline(m *Machine) {
+	homeDir, _ := os.UserHomeDir()
+	histFile := filepath.Join(homeDir, ".joy_history")
+
+	rl, err := readline.NewEx(&readline.Config{
+		Prompt:            "joy> ",
+		HistoryFile:       histFile,
+		HistorySearchFold: true,
+	})
+	if err != nil {
+		// Fall back to pipe mode
+		replPipe(m)
+		return
+	}
+	defer rl.Close()
+
+	for {
+		line, err := rl.Readline()
+		if err != nil {
+			break
+		}
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		if m.Echo > 0 {
+			fmt.Println(line)
+		}
+		if err := m.RunLine(line); err != nil {
+			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		} else if m.Autoput == 1 && len(m.Stack) > 0 {
+			fmt.Println(m.Stack[len(m.Stack)-1].String())
+		} else if m.Autoput == 2 && len(m.Stack) > 0 {
+			fmt.Println(m.PrintStack())
+		}
+	}
+	fmt.Println()
+}
+
+func replPipe(m *Machine) {
 	scanner := bufio.NewScanner(os.Stdin)
 	for {
 		fmt.Print("joy> ")
