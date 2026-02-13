@@ -1,0 +1,151 @@
+(* lsplib.joy — Eval-apply Lisp interpreter *)
+(* Adapted from the C reference implementation *)
+(* Requires: basic-libload (agglib, numlib, seqlib) *)
+basic-libload
+
+LIBRA
+
+    _lsplib == true;
+
+(*   - - -            L I S P   I N T E R P R E T E R             - - - *)
+
+eval ==
+    [ list ]
+
+    [
+      unswons
+      [ [ QUOTE
+          first ]
+        [ LAMBDA
+          dupd cons [CLOSURE] swoncat ]
+        [ IF
+          uncons [eval] dip
+          swap
+          [ null ]
+          [ pop second]
+          [ pop first ]
+          ifte eval ]
+        [ DEF
+          uncons first swap
+          [ eval ]
+          dip
+          dup
+          [ [[] cons] unary2
+            swons
+            swons ]
+          dip ]
+        [ DEFUN
+          uncons
+          [LAMBDA] swoncat
+          [] cons cons
+          [DEF] swoncat
+          eval ]
+        [ (* DEFAULT *)
+          swons [eval] map unswons
+          apply ] ]
+      case ]
+
+    [
+      [ [numerical] [string] sequor ]
+        [ ]
+        [
+          dupd swap
+          [
+            [ null ]
+            [ true ]
+            [ first first in ]
+            ifte ]
+          [ [ null ]
+            [ pop ]
+            [
+              first unswons rolldown
+              [ [first] dip = ]
+              [ pop pop first ]
+              [ [ [rest] unary2] dip ]
+              tailrec ]
+            ifte ]
+          [ rest ]
+          tailrec ]
+        ifte ]
+
+    ifte;
+
+apply ==
+    [ list ]
+
+    [
+      unswons
+      [ [ CLOSURE
+          unswons call swons
+          uncons swapd uncons
+          [ swap cons
+            swons ]
+          dip eval
+          popd ]
+        [ "apply: unknown procedure type -\n"
+          putchars abort ] ]
+      case ]
+
+    [
+      [ [ CAR first first ]
+        [ CDR first rest ]
+        [ CONS uncons first cons ]
+        [ EQ uncons first equal ]
+        [ ATOM first leaf ]
+        [ NULL first null ]
+        [ LIST (* do nothing *) ]
+        [ (* try Joy: *)
+          [i] dip call ] ]
+      case ]
+
+    ifte;
+
+lib0 ==
+        [
+          [ [ FOLDR ]
+            [ CLOSURE lib0 [lis ini bin]
+              IF [NULL lis] ini
+                 [bin [CAR lis]
+                      [FOLDR [CDR lis] ini bin] ] ] ]
+          [ [ FOLDL ]
+            [ CLOSURE lib0 [lis ini bin]
+              IF [NULL lis] ini
+                 [FOLDL [CDR lis]
+                        [bin [CAR lis] ini]
+                        bin ] ] ]
+          [ [ FOLDR2 ]
+            [ CLOSURE lib0 [l1 l2 ini tern]
+              IF [or [NULL l1] [NULL l2]] ini
+                 [ tern [CAR l1] [CAR l2]
+                        [FOLDR2 [CDR l1] [CDR l2] ini tern] ] ] ]
+          [ [ RECFOLDR ]
+            [ CLOSURE lib0 [x y bin]
+              IF [ATOM x]
+                 [bin x y]
+                 [IF [NULL x]
+                     y
+                     [RECFOLDR [CAR x]
+                               [RECFOLDR [CDR x]
+                                         y
+                                         bin]
+                               bin] ] ] ]
+            ];
+
+l-prompt == "L: ";
+
+lisp ==
+        [ "\nLisp interpreter\n"
+          "\t\tTo include the Lisp library, type\n"
+          "\t\t\t[ include  \"OK\"  \"lsplib.lsp\" ]\n"
+          "GO\n\n" ]
+        putstrings
+        lib0
+        l-prompt putchars get
+        [ "EXIT" = not ]
+        [ eval putln
+          l-prompt putchars get ]
+        while
+        pop pop
+        "exit from Lisp interpreter\n" putchars;
+
+    LSPLIB == "lsplib.joy - (eval-apply) Lisp interpreter\n" .
