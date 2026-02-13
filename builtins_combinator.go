@@ -346,6 +346,7 @@ func init() {
 	})
 
 	// filter: A [P] -> B — keep elements where P is true
+	// filter: A [B] -> A' — SAVESTACK: restores stack between iterations
 	register("filter", func(m *Machine) {
 		m.NeedStack(2, "filter")
 		q := m.Pop()
@@ -353,10 +354,14 @@ func init() {
 		if q.Typ != TypeList {
 			joyErr("filter: quotation expected")
 		}
+		savedStack := make([]Value, len(m.Stack))
+		copy(savedStack, m.Stack)
 		switch agg.Typ {
 		case TypeList:
 			var result []Value
 			for _, item := range agg.List {
+				m.Stack = make([]Value, len(savedStack))
+				copy(m.Stack, savedStack)
 				m.Push(item)
 				m.Execute(q.List)
 				cond := m.Pop()
@@ -367,10 +372,14 @@ func init() {
 			if result == nil {
 				result = []Value{}
 			}
+			m.Stack = make([]Value, len(savedStack))
+			copy(m.Stack, savedStack)
 			m.Push(ListVal(result))
 		case TypeString:
 			var result []byte
 			for _, ch := range agg.Str {
+				m.Stack = make([]Value, len(savedStack))
+				copy(m.Stack, savedStack)
 				m.Push(CharVal(int64(ch)))
 				m.Execute(q.List)
 				cond := m.Pop()
@@ -378,11 +387,15 @@ func init() {
 					result = append(result, byte(ch))
 				}
 			}
+			m.Stack = make([]Value, len(savedStack))
+			copy(m.Stack, savedStack)
 			m.Push(StringVal(string(result)))
 		case TypeSet:
 			var bits int64
 			for i := 0; i < SetSize; i++ {
 				if agg.Int&(1<<i) != 0 {
+					m.Stack = make([]Value, len(savedStack))
+					copy(m.Stack, savedStack)
 					m.Push(IntVal(int64(i)))
 					m.Execute(q.List)
 					cond := m.Pop()
@@ -391,6 +404,8 @@ func init() {
 					}
 				}
 			}
+			m.Stack = make([]Value, len(savedStack))
+			copy(m.Stack, savedStack)
 			m.Push(SetVal(bits))
 		default:
 			joyErr("filter: aggregate expected")
@@ -615,7 +630,7 @@ func init() {
 	}
 	register("treegenrec", treegenrecFn)
 
-	// some: A [B] -> X — true if any aggregate member satisfies B
+	// some: A [B] -> X — true if any member satisfies B (SAVESTACK)
 	register("some", func(m *Machine) {
 		m.NeedStack(2, "some")
 		b := m.Pop()
@@ -623,21 +638,31 @@ func init() {
 		if b.Typ != TypeList {
 			joyErr("some: quotation expected")
 		}
+		savedStack := make([]Value, len(m.Stack))
+		copy(savedStack, m.Stack)
 		switch a.Typ {
 		case TypeList:
 			for _, item := range a.List {
+				m.Stack = make([]Value, len(savedStack))
+				copy(m.Stack, savedStack)
 				m.Push(item)
 				m.Execute(b.List)
 				if m.Pop().IsTruthy() {
+					m.Stack = make([]Value, len(savedStack))
+					copy(m.Stack, savedStack)
 					m.Push(BoolVal(true))
 					return
 				}
 			}
 		case TypeString:
 			for _, ch := range a.Str {
+				m.Stack = make([]Value, len(savedStack))
+				copy(m.Stack, savedStack)
 				m.Push(CharVal(int64(ch)))
 				m.Execute(b.List)
 				if m.Pop().IsTruthy() {
+					m.Stack = make([]Value, len(savedStack))
+					copy(m.Stack, savedStack)
 					m.Push(BoolVal(true))
 					return
 				}
@@ -645,9 +670,13 @@ func init() {
 		case TypeSet:
 			for i := 0; i < SetSize; i++ {
 				if a.Int&(1<<i) != 0 {
+					m.Stack = make([]Value, len(savedStack))
+					copy(m.Stack, savedStack)
 					m.Push(IntVal(int64(i)))
 					m.Execute(b.List)
 					if m.Pop().IsTruthy() {
+						m.Stack = make([]Value, len(savedStack))
+						copy(m.Stack, savedStack)
 						m.Push(BoolVal(true))
 						return
 					}
@@ -656,10 +685,12 @@ func init() {
 		default:
 			joyErr("some: aggregate expected")
 		}
+		m.Stack = make([]Value, len(savedStack))
+		copy(m.Stack, savedStack)
 		m.Push(BoolVal(false))
 	})
 
-	// all: A [B] -> X — true if all aggregate members satisfy B
+	// all: A [B] -> X — true if all members satisfy B (SAVESTACK)
 	register("all", func(m *Machine) {
 		m.NeedStack(2, "all")
 		b := m.Pop()
@@ -667,21 +698,31 @@ func init() {
 		if b.Typ != TypeList {
 			joyErr("all: quotation expected")
 		}
+		savedStack := make([]Value, len(m.Stack))
+		copy(savedStack, m.Stack)
 		switch a.Typ {
 		case TypeList:
 			for _, item := range a.List {
+				m.Stack = make([]Value, len(savedStack))
+				copy(m.Stack, savedStack)
 				m.Push(item)
 				m.Execute(b.List)
 				if !m.Pop().IsTruthy() {
+					m.Stack = make([]Value, len(savedStack))
+					copy(m.Stack, savedStack)
 					m.Push(BoolVal(false))
 					return
 				}
 			}
 		case TypeString:
 			for _, ch := range a.Str {
+				m.Stack = make([]Value, len(savedStack))
+				copy(m.Stack, savedStack)
 				m.Push(CharVal(int64(ch)))
 				m.Execute(b.List)
 				if !m.Pop().IsTruthy() {
+					m.Stack = make([]Value, len(savedStack))
+					copy(m.Stack, savedStack)
 					m.Push(BoolVal(false))
 					return
 				}
@@ -689,9 +730,13 @@ func init() {
 		case TypeSet:
 			for i := 0; i < SetSize; i++ {
 				if a.Int&(1<<i) != 0 {
+					m.Stack = make([]Value, len(savedStack))
+					copy(m.Stack, savedStack)
 					m.Push(IntVal(int64(i)))
 					m.Execute(b.List)
 					if !m.Pop().IsTruthy() {
+						m.Stack = make([]Value, len(savedStack))
+						copy(m.Stack, savedStack)
 						m.Push(BoolVal(false))
 						return
 					}
@@ -700,6 +745,8 @@ func init() {
 		default:
 			joyErr("all: aggregate expected")
 		}
+		m.Stack = make([]Value, len(savedStack))
+		copy(m.Stack, savedStack)
 		m.Push(BoolVal(true))
 	})
 

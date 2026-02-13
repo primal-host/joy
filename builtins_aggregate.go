@@ -388,6 +388,7 @@ func init() {
 		}
 	})
 
+	// split: A [B] -> A1 A2 — SAVESTACK: restores stack between iterations
 	register("split", func(m *Machine) {
 		m.NeedStack(2, "split")
 		quot := m.Pop()
@@ -398,8 +399,12 @@ func init() {
 		if agg.Typ != TypeList {
 			joyErr("split: list expected as second parameter")
 		}
+		savedStack := make([]Value, len(m.Stack))
+		copy(savedStack, m.Stack)
 		var yes, no []Value
 		for _, item := range agg.List {
+			m.Stack = make([]Value, len(savedStack))
+			copy(m.Stack, savedStack)
 			m.Push(item)
 			m.Execute(quot.List)
 			result := m.Pop()
@@ -415,6 +420,8 @@ func init() {
 		if no == nil {
 			no = []Value{}
 		}
+		m.Stack = make([]Value, len(savedStack))
+		copy(m.Stack, savedStack)
 		m.Push(ListVal(yes))
 		m.Push(ListVal(no))
 	})
