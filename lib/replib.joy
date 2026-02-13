@@ -1,0 +1,90 @@
+(* replib.joy — Replicating programs library *)
+(* Adapted from the C reference implementation *)
+(* Requires: agglib *)
+"agglib" libload
+
+LIBRA
+
+    _replib == true;
+
+MODULE rep
+
+PRIVATE
+    foo == "foo"
+
+PUBLIC
+
+    duco == dup cons;
+    dureco == dup rest cons;
+    durereco == dup rest rest cons;
+
+    count == [0 [succ] infra] swoncat;
+    deposit == [dup [first] dip] swoncat;
+
+    self == [duco]         duco;      exe   == [dip duco]   cons       duco;
+    ints == [dureco] count dureco;    exe-c == [dip dureco] cons count dureco;
+
+    c-stream == [dureco] cons dureco;
+    c-stream-d == [dureco] deposit cons dureco;
+
+    n-stream == [infra dureco] cons cons dureco;
+    n-stream-d == [infra dureco] cons deposit cons dureco;
+
+    f-stream-prepare ==
+        swap
+        [dip] cons concat
+        cons
+        [dup] infra
+        dup rest rest infra
+        uncons uncons
+        [pop dup] swoncat
+        [infra durereco] cons;
+
+    f-stream == f-stream-prepare cons cons durereco;
+    f-stream-d == f-stream-prepare deposit cons cons durereco;
+
+    inter ==
+        [dip cons dureco] cons
+        [uncons] swoncat
+        cons dureco;
+
+    exe-t ==
+        [dip dureco] cons
+        [[pred] infra] swoncat
+        [ifte] cons
+        [pop [[duco] duco]] swons
+        [first null] swons
+        cons dureco;
+
+    fix == [duco] swoncat duco;
+    fix-c == [0 [succ] infra dureco] swoncat dureco;
+
+    fix-i ==
+        [dip cons dureco] cons
+        [uncons] swoncat
+        cons
+        swoncat
+        dureco;
+
+    fix-a == [] [[cons] unary] fix-i;
+
+    _expand ==
+        swap
+        [dip] cons
+        concat
+        [dip] swoncat
+        cons
+
+        [ [dip] cons
+
+          [ [pop] swoncat] dip ]
+        dip
+
+        [ifte] cons cons cons;
+
+    linear == [i] _expand;
+    binary == [dip swap i] _expand
+
+END;
+
+    REPLIB == "replib.joy - for survey of replicating programs\n" .
