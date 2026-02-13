@@ -649,6 +649,30 @@ func init() {
 		m.Push(BoolVal(true))
 	})
 
+	// unary2: X Y [P] -> R S — apply P to X (yielding R), then to Y (yielding S)
+	register("unary2", func(m *Machine) {
+		m.NeedStack(3, "unary2")
+		q := m.Pop()
+		y := m.Pop()
+		// X is on top of stack now
+		if q.Typ != TypeList {
+			joyErr("unary2: quotation expected")
+		}
+		savedStack := make([]Value, len(m.Stack))
+		copy(savedStack, m.Stack)
+		// Execute P on X (X is on stack top)
+		m.Execute(q.List)
+		r := m.Pop()
+		// Restore stack minus X, push Y
+		m.Stack = savedStack[:len(savedStack)-1]
+		m.Push(y)
+		m.Execute(q.List)
+		s := m.Pop()
+		m.Stack = savedStack[:len(savedStack)-1]
+		m.Push(r)
+		m.Push(s)
+	})
+
 	// while: [B] [P] -> ... — while B is true, execute P
 	register("while", func(m *Machine) {
 		m.NeedStack(2, "while")
