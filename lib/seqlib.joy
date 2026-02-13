@@ -1,0 +1,36 @@
+(* seqlib.joy — Sequence library *)
+(* Adapted from the C reference implementation *)
+(* Requires: agglib *)
+"agglib" libload
+
+(* ===== Output ===== *)
+DEFINE
+  putlist == [] [put] step newline .
+
+(* ===== Reversal ===== *)
+DEFINE
+  reverselist   == [] swap [swons] step ;
+  reversestring == "" swap [swons] step .
+
+(* ===== Flatten ===== *)
+DEFINE
+  seqflatten == [list] [[] swap [seqflatten swoncat] step] [unitlist] ifte .
+
+(* ===== Sorting ===== *)
+DEFINE
+  qsort == (* L -> L' — quicksort a list *)
+    [small]
+    []
+    [uncons [dupd >=] split]
+    [enconcat]
+    binrec .
+
+(* ===== Sequences ===== *)
+DEFINE
+  insertlist == [swons] fold ;
+  scalarproduct == 0 rolldown [* rolldown + swap] step pop .
+
+(* ===== Tree operations ===== *)
+DEFINE
+  treeflatten == [list] [[] swap [treeflatten swoncat] step] [unitlist] ifte ;
+  treemap     == [list] [swap [treemap] cons map] [swap i] ifte .
