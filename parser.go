@@ -109,6 +109,8 @@ func (p *Parser) parseHide() {
 	scopeID := p.pushScope()
 	prefix := fmt.Sprintf("__scope_%d_", scopeID)
 
+	// Pre-scan to register all definition names in scope (enables forward references)
+	p.prescanDefNames(prefix)
 	// Parse hidden definitions until IN
 	p.parseDefSequence(prefix)
 
@@ -209,6 +211,47 @@ func (p *Parser) parseModule() {
 	p.modulePrefix = prevModPrefix
 	p.moduleScopeIdx = prevModScope
 	p.popScope()
+}
+
+// prescanDefNames pre-registers all definition names in the current scope.
+// This enables forward references within HIDE blocks (e.g. I2C calling I2T).
+// The scan is lightweight: it skips bodies by counting bracket depth.
+func (p *Parser) prescanDefNames(prefix string) {
+	if prefix == "" {
+		return
+	}
+	saved := p.pos
+	depth := 0
+	for p.pos < len(p.tokens) {
+		tok := p.tokens[p.pos]
+		// Stop at scope boundaries
+		if depth == 0 && (tok.Typ == TokIn || tok.Typ == TokEnd || tok.Typ == TokDot) {
+			break
+		}
+		// Track bracket depth to skip list contents
+		if tok.Typ == TokLBrack || tok.Typ == TokLBrace {
+			depth++
+			p.pos++
+			continue
+		}
+		if tok.Typ == TokRBrack || tok.Typ == TokRBrace {
+			depth--
+			p.pos++
+			continue
+		}
+		if depth > 0 {
+			p.pos++
+			continue
+		}
+		// At top level: look for name == pattern
+		if tok.Typ == TokAtom && p.pos+1 < len(p.tokens) && p.tokens[p.pos+1].Typ == TokEqDef {
+			name := tok.Str
+			dictName := prefix + name
+			p.scopes[len(p.scopes)-1][name] = dictName
+		}
+		p.pos++
+	}
+	p.pos = saved
 }
 
 // parseDefSequence parses a sequence of name == body definitions.

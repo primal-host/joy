@@ -280,6 +280,13 @@ func (s *Scanner) scanNumber() Token {
 func (s *Scanner) scanAtom() Token {
 	start := s.pos
 	for !s.atEnd() && isAtomChar(s.peek()) {
+		// Only include '.' if followed by another atom char (module dot-notation: m1.ab)
+		// Don't include trailing '.' (statement terminator: foo.)
+		if s.peek() == '.' {
+			if s.pos+1 >= len(s.src) || !isAtomChar(rune(s.src[s.pos+1])) || s.src[s.pos+1] == '.' {
+				break
+			}
+		}
 		s.advance()
 	}
 	text := string(s.src[start:s.pos])

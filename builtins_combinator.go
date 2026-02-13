@@ -170,23 +170,25 @@ func init() {
 		}
 	})
 
-	// cond: [[T1] [B1] [T2] [B2] ... [Def]] -> ...
+	// cond: [..[[Bi] Ti]..[D]] -> ...
+	// Tries each Bi (save/restore stack). If true, executes Ti.
+	// Last clause is always the default — executed as-is if no Bi matched.
 	register("cond", func(m *Machine) {
 		m.NeedStack(1, "cond")
 		clauses := m.Pop()
 		if clauses.Typ != TypeList {
 			joyErr("cond: list of clauses expected")
 		}
-		for _, clause := range clauses.List {
+		n := len(clauses.List)
+		if n == 0 {
+			return
+		}
+		// Try all clauses except the last as [test body...]
+		for i := 0; i < n-1; i++ {
+			clause := clauses.List[i]
 			if clause.Typ != TypeList || len(clause.List) == 0 {
 				joyErr("cond: each clause must be a non-empty list")
 			}
-			if len(clause.List) == 1 {
-				// default clause
-				m.Execute(clause.List)
-				return
-			}
-			// [Test Body]
 			test := clause.List[0]
 			body := clause.List[1:]
 			if test.Typ == TypeList {
@@ -203,6 +205,11 @@ func init() {
 				m.Execute(body)
 				return
 			}
+		}
+		// Last clause is the default — execute entire clause body
+		def := clauses.List[n-1]
+		if def.Typ == TypeList {
+			m.Execute(def.List)
 		}
 	})
 
