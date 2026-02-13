@@ -1,9 +1,12 @@
 package main
 
+import "fmt"
+
 type Parser struct {
 	tokens  []Token
 	pos     int
 	machine *Machine
+	scopes  []map[string]string // stack of {originalName → mangledName}
 }
 
 func NewParser(tokens []Token, m *Machine) *Parser {
@@ -27,13 +30,31 @@ func (p *Parser) atEnd() bool {
 	return p.pos >= len(p.tokens) || p.tokens[p.pos].Typ == TokEOF
 }
 
-// Parse processes all tokens, handling DEFINE blocks and returning the remaining program.
+// pushScope increments the machine scope counter and pushes a new scope map.
+func (p *Parser) pushScope() int {
+	p.machine.ScopeID++
+	id := p.machine.ScopeID
+	p.scopes = append(p.scopes, map[string]string{})
+	return id
+}
+
+// popScope removes the innermost scope map.
+func (p *Parser) popScope() {
+	if len(p.scopes) > 0 {
+		p.scopes = p.scopes[:len(p.scopes)-1]
+	}
+}
+
+// Parse processes all tokens, handling DEFINE and HIDE blocks and returning the remaining program.
 func (p *Parser) Parse() []Value {
 	var program []Value
 	for !p.atEnd() {
-		if p.peek().Typ == TokDefine {
+		switch p.peek().Typ {
+		case TokDefine:
 			p.parseDefine()
-		} else {
+		case TokHide:
+			p.parseHide()
+		default:
 			program = append(program, p.parseTerm()...)
 		}
 	}
@@ -46,6 +67,10 @@ func (p *Parser) parseDefine() {
 		if p.peek().Typ == TokDot {
 			p.advance() // consume trailing .
 			break
+		}
+		if p.peek().Typ == TokHide {
+			p.parseHide()
+			continue
 		}
 		// expect: name == body ;|.
 		if p.peek().Typ != TokAtom {
@@ -65,12 +90,83 @@ func (p *Parser) parseDefine() {
 	}
 }
 
-// readBody reads values until ; or . (at top level of DEFINE)
+// parseHide handles HIDE ... IN ... END scoping.
+func (p *Parser) parseHide() {
+	p.advance() // consume HIDE
+	scopeID := p.pushScope()
+	prefix := fmt.Sprintf("__scope_%d_", scopeID)
+
+	// Parse hidden definitions until IN
+	p.parseDefSequence(prefix)
+
+	// Expect IN
+	if !p.atEnd() && p.peek().Typ == TokIn {
+		p.advance() // consume IN
+	} else {
+		joyErr("expected IN after HIDE definitions")
+	}
+
+	// Parse public definitions until END (no mangling)
+	p.parseDefSequence("")
+
+	// Expect END
+	if !p.atEnd() && p.peek().Typ == TokEnd {
+		p.advance() // consume END
+	} else {
+		joyErr("expected END after IN definitions")
+	}
+
+	p.popScope()
+}
+
+// parseDefSequence parses a sequence of name == body definitions.
+// If prefix is non-empty, names are mangled and registered in the current scope.
+// Stops at IN, END, or end of input.
+func (p *Parser) parseDefSequence(prefix string) {
+	for !p.atEnd() {
+		tok := p.peek()
+		if tok.Typ == TokIn || tok.Typ == TokEnd || tok.Typ == TokDot {
+			break
+		}
+		if tok.Typ == TokHide {
+			p.parseHide()
+			continue
+		}
+		if tok.Typ == TokDefine {
+			p.advance() // consume DEFINE keyword (optional inside HIDE blocks)
+			continue
+		}
+		if tok.Typ != TokAtom {
+			joyErr("expected atom in definition, got %s", tok.Str)
+		}
+		name := p.advance().Str
+		if p.peek().Typ != TokEqDef {
+			joyErr("expected == after %s", name)
+		}
+		p.advance() // consume ==
+		body := p.readBody()
+
+		dictName := name
+		if prefix != "" {
+			dictName = prefix + name
+			// Register in current scope map
+			p.scopes[len(p.scopes)-1][name] = dictName
+		}
+		p.machine.Dict[dictName] = body
+
+		// consume optional ;
+		if !p.atEnd() && p.peek().Typ == TokSemiCol {
+			p.advance()
+		}
+	}
+}
+
+// readBody reads values until ; or . or IN or END or HIDE (at top level of DEFINE/HIDE)
 func (p *Parser) readBody() []Value {
 	var body []Value
 	for !p.atEnd() {
 		tok := p.peek()
-		if tok.Typ == TokSemiCol || tok.Typ == TokDot {
+		if tok.Typ == TokSemiCol || tok.Typ == TokDot || tok.Typ == TokIn || tok.Typ == TokEnd || tok.Typ == TokHide {
 			break
 		}
 		// check if next atom looks like start of next definition (atom followed by ==)
@@ -170,6 +266,12 @@ func (p *Parser) resolveAtom(name string) Value {
 		return BoolVal(true)
 	case "false":
 		return BoolVal(false)
+	}
+	// Check scope stack (inner to outer) for mangled name
+	for i := len(p.scopes) - 1; i >= 0; i-- {
+		if mangled, ok := p.scopes[i][name]; ok {
+			return UserDefVal(mangled)
+		}
 	}
 	return UserDefVal(name)
 }
