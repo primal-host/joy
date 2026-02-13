@@ -1068,5 +1068,126 @@ func TestUndefs(t *testing.T) {
 	}
 }
 
+func TestFileIO(t *testing.T) {
+	dir := t.TempDir()
+	path := dir + "/test.txt"
+
+	// Write content to file, close, reopen, read back
+	m := NewMachine()
+	// Store path in a define for convenience
+	if err := m.RunLine(fmt.Sprintf(`DEFINE testpath == "%s" .`, path)); err != nil {
+		t.Fatalf("define: %v", err)
+	}
+
+	// Write
+	if err := m.RunLine(`testpath "w" fopen`); err != nil {
+		t.Fatalf("fopen: %v", err)
+	}
+	if err := m.RunLine(`"hello" fputchars`); err != nil {
+		t.Fatalf("fputchars: %v", err)
+	}
+	if err := m.RunLine("fclose"); err != nil {
+		t.Fatalf("fclose: %v", err)
+	}
+
+	// Read back
+	if err := m.RunLine(`testpath "r" fopen`); err != nil {
+		t.Fatalf("fopen read: %v", err)
+	}
+	if err := m.RunLine("5 fread"); err != nil {
+		t.Fatalf("fread: %v", err)
+	}
+	out := captureOutput(func() {
+		if err := m.RunLine("size ."); err != nil {
+			t.Fatalf("size: %v", err)
+		}
+	})
+	if out != "5\n" {
+		t.Errorf("fread size: got %q, want %q", out, "5\n")
+	}
+	if err := m.RunLine("fclose"); err != nil {
+		t.Fatalf("fclose read: %v", err)
+	}
+}
+
+func TestFileSeekTell(t *testing.T) {
+	dir := t.TempDir()
+	path := dir + "/seek.txt"
+
+	m := NewMachine()
+	// Write "abcde"
+	if err := m.RunLine(fmt.Sprintf(`"%s" "w" fopen "abcde" fputchars fclose`, path)); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	// Open, seek to position 2, read 1 byte
+	if err := m.RunLine(fmt.Sprintf(`"%s" "r" fopen`, path)); err != nil {
+		t.Fatalf("fopen: %v", err)
+	}
+	if err := m.RunLine("2 0 fseek"); err != nil {
+		t.Fatalf("fseek: %v", err)
+	}
+	out := captureOutput(func() {
+		if err := m.RunLine("ftell ."); err != nil {
+			t.Fatalf("ftell: %v", err)
+		}
+	})
+	if out != "2\n" {
+		t.Errorf("ftell: got %q, want %q", out, "2\n")
+	}
+	if err := m.RunLine("fclose"); err != nil {
+		t.Fatalf("fclose: %v", err)
+	}
+}
+
+func TestFremove(t *testing.T) {
+	dir := t.TempDir()
+	path := dir + "/remove.txt"
+
+	m := NewMachine()
+	// Create file
+	if err := m.RunLine(fmt.Sprintf(`"%s" "w" fopen fclose`, path)); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	// Remove it
+	out := captureOutput(func() {
+		if err := m.RunLine(fmt.Sprintf(`"%s" fremove .`, path)); err != nil {
+			t.Fatalf("fremove: %v", err)
+		}
+	})
+	if out != "true\n" {
+		t.Errorf("fremove: got %q, want %q", out, "true\n")
+	}
+	// Try to remove again — should fail
+	out = captureOutput(func() {
+		if err := m.RunLine(fmt.Sprintf(`"%s" fremove .`, path)); err != nil {
+			t.Fatalf("fremove2: %v", err)
+		}
+	})
+	if out != "false\n" {
+		t.Errorf("fremove non-existent: got %q, want %q", out, "false\n")
+	}
+}
+
+func TestFilePredicate(t *testing.T) {
+	m := NewMachine()
+	out := captureOutput(func() {
+		if err := m.RunLine("stdin file ."); err != nil {
+			t.Fatalf("error: %v", err)
+		}
+	})
+	if out != "true\n" {
+		t.Errorf("file predicate: got %q, want %q", out, "true\n")
+	}
+	out = captureOutput(func() {
+		if err := m.RunLine("42 file ."); err != nil {
+			t.Fatalf("error: %v", err)
+		}
+	})
+	if out != "false\n" {
+		t.Errorf("file predicate int: got %q, want %q", out, "false\n")
+	}
+}
+
 // Silence unused import warning for fmt
 var _ = fmt.Sprint
