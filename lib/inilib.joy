@@ -96,6 +96,7 @@ DEFINE
 DEFINE
   libload       == ".joy" concat include ;
   libinclude    == libload ;
+  basic-libload == "agglib" libload "numlib" libload "seqlib" libload ;
   verbose       == true .
 
 (* verbose is a flag used by libraries for optional output *)

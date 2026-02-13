@@ -66,14 +66,23 @@ func (p *Parser) Parse() []Value {
 }
 
 func (p *Parser) parseDefine() {
-	p.advance() // consume DEFINE
+	p.advance() // consume DEFINE/LIBRA
 	for !p.atEnd() {
-		if p.peek().Typ == TokDot {
+		switch p.peek().Typ {
+		case TokDot:
 			p.advance() // consume trailing .
-			break
-		}
-		if p.peek().Typ == TokHide {
+			return
+		case TokEnd:
+			p.advance() // LIBRA ... END
+			return
+		case TokHide:
 			p.parseHide()
+			continue
+		case TokModule:
+			p.parseModule()
+			continue
+		case TokSemiCol:
+			p.advance() // skip stray semicolons
 			continue
 		}
 		// expect: name == body ;|.

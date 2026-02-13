@@ -291,6 +291,33 @@ func init() {
 		}
 	})
 
+	// mapr2: A B [P] -> C — zip-map: apply P to corresponding elements of A and B
+	register("mapr2", func(m *Machine) {
+		m.NeedStack(3, "mapr2")
+		q := m.Pop()
+		b := m.Pop()
+		a := m.Pop()
+		if q.Typ != TypeList {
+			joyErr("mapr2: quotation expected")
+		}
+		if a.Typ != TypeList || b.Typ != TypeList {
+			joyErr("mapr2: two lists expected")
+		}
+		la, lb := a.List, b.List
+		n := len(la)
+		if len(lb) < n {
+			n = len(lb)
+		}
+		result := make([]Value, 0, n)
+		for i := 0; i < n; i++ {
+			m.Push(la[i])
+			m.Push(lb[i])
+			m.Execute(q.List)
+			result = append(result, m.Pop())
+		}
+		m.Push(ListVal(result))
+	})
+
 	// filter: A [P] -> B — keep elements where P is true
 	register("filter", func(m *Machine) {
 		m.NeedStack(2, "filter")
