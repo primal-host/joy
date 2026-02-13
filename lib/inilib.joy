@@ -1,0 +1,51 @@
+(* inilib.joy — Joy standard library initialization *)
+(* Adapted from the C reference implementation *)
+
+(* Stack manipulation shortcuts *)
+DEFINE
+  popd    == [pop] dip ;
+  dupd    == [dup] dip ;
+  swapd   == [swap] dip ;
+  rollupd == [rollup] dip ;
+  id      == ;
+  pop2    == pop pop ;
+  pop3    == pop pop pop ;
+  dup2    == dup [dup] dip swap .
+
+(* Boolean / comparison helpers *)
+DEFINE
+  not2    == not not ;
+  truth   == true ;
+  falsity == false ;
+  nullary2 == [nullary] dip nullary ;
+  nullary3 == [nullary2] dip nullary .
+
+(* Arithmetic helpers *)
+DEFINE
+  sqr     == dup * ;
+  cube    == dup dup * * ;
+  average == dup [+] fold swap size / ;
+  positive == 0 > ;
+  negative == 0 < ;
+  even    == 2 rem 0 = ;
+  odd     == even not .
+
+(* Aggregate helpers *)
+DEFINE
+  sum     == 0 swap [+] fold ;
+  product == 1 swap [*] fold ;
+  swoncat == swap concat ;
+  shunt   == [swons] step ;
+  flatten == [] [concat] fold ;
+  second  == rest first ;
+  third   == rest rest first .
+
+(* List construction *)
+DEFINE
+  unitlist == [] cons ;
+  unitstring == "" cons .
+
+(* Higher-order *)
+DEFINE
+  twice   == dup concat i ;
+  thrice  == dup dup concat concat i .
