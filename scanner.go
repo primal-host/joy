@@ -24,6 +24,7 @@ const (
 	TokHide                     // HIDE, PRIVATE
 	TokIn                       // IN
 	TokEnd                      // END
+	TokModule                   // MODULE
 	TokEqDef                    // ==
 	TokEOF
 )
@@ -295,6 +296,8 @@ func (s *Scanner) scanAtom() Token {
 		return Token{Typ: TokIn, Str: text}
 	case "END":
 		return Token{Typ: TokEnd, Str: text}
+	case "MODULE":
+		return Token{Typ: TokModule, Str: text}
 	case "==":
 		return Token{Typ: TokEqDef, Str: text}
 	default:
