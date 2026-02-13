@@ -1189,5 +1189,119 @@ func TestFilePredicate(t *testing.T) {
 	}
 }
 
+func TestInclude(t *testing.T) {
+	dir := t.TempDir()
+	// Write a library file
+	libPath := dir + "/mylib.joy"
+	os.WriteFile(libPath, []byte("DEFINE double == 2 * ."), 0644)
+
+	m := NewMachine()
+	m.LibPaths = append(m.LibPaths, dir)
+
+	// Include the library
+	if err := m.RunLine(`"mylib.joy" include`); err != nil {
+		t.Fatalf("include: %v", err)
+	}
+
+	// Use the definition
+	out := captureOutput(func() {
+		if err := m.RunLine("7 double ."); err != nil {
+			t.Fatalf("error: %v", err)
+		}
+	})
+	if out != "14\n" {
+		t.Errorf("got %q, want %q", out, "14\n")
+	}
+}
+
+func TestIncludeGuard(t *testing.T) {
+	dir := t.TempDir()
+	// Write a library that pushes 42 each time it runs
+	libPath := dir + "/counter.joy"
+	os.WriteFile(libPath, []byte("42"), 0644)
+
+	m := NewMachine()
+	m.LibPaths = append(m.LibPaths, dir)
+
+	// Include twice
+	if err := m.RunLine(`"counter.joy" include`); err != nil {
+		t.Fatalf("include 1: %v", err)
+	}
+	if err := m.RunLine(`"counter.joy" include`); err != nil {
+		t.Fatalf("include 2: %v", err)
+	}
+
+	// Stack should only have one 42 (guard prevented second load)
+	out := captureOutput(func() {
+		if err := m.RunLine(".s"); err != nil {
+			t.Fatalf("error: %v", err)
+		}
+	})
+	if out != "42\n" {
+		t.Errorf("include guard: got %q, want %q (double include should be prevented)", out, "42\n")
+	}
+}
+
+func TestFormatf(t *testing.T) {
+	tests := []struct {
+		input  string
+		expect string
+	}{
+		{"3.14159 'f 8 4 formatf .", "\"  3.1416\"\n"},
+		{"3.14159 'e 12 4 formatf .", "\"  3.1416e+00\"\n"},
+		{"3.14159 'g 8 4 formatf .", "\"   3.142\"\n"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			m := NewMachine()
+			out := captureOutput(func() {
+				if err := m.RunLine(tt.input); err != nil {
+					t.Fatalf("error: %v", err)
+				}
+			})
+			if out != tt.expect {
+				t.Errorf("got %q, want %q", out, tt.expect)
+			}
+		})
+	}
+}
+
+func TestEmbeddedInilib(t *testing.T) {
+	m := NewMachine()
+	// Load inilib from embedded FS
+	if err := m.RunFile("inilib.joy"); err != nil {
+		t.Fatalf("include inilib: %v", err)
+	}
+
+	// Test some inilib definitions
+	tests := []struct {
+		input  string
+		expect string
+	}{
+		{"5 sqr .", "25\n"},
+		{"3 cube .", "27\n"},
+		{"4 even .", "true\n"},
+		{"3 odd .", "true\n"},
+		{"5 positive .", "true\n"},
+		{"-3 negative .", "true\n"},
+		{"[1 2 3] sum .", "6\n"},
+		{"[2 3 4] product .", "24\n"},
+		{"[1 2 3] second .", "2\n"},
+		{"[1 2 3] third .", "3\n"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			out := captureOutput(func() {
+				if err := m.RunLine(tt.input); err != nil {
+					t.Fatalf("error: %v", err)
+				}
+			})
+			if out != tt.expect {
+				t.Errorf("got %q, want %q", out, tt.expect)
+			}
+		})
+	}
+}
+
 // Silence unused import warning for fmt
 var _ = fmt.Sprint
