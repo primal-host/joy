@@ -156,6 +156,12 @@ func init() {
 		m.Echo = int(a.Int)
 	})
 
+	// GC trace toggle — no-op in this implementation, pops one arg
+	register("__settracegc", func(m *Machine) {
+		m.NeedStack(1, "__settracegc")
+		m.Pop()
+	})
+
 	register("setundeferror", func(m *Machine) {
 		m.NeedStack(1, "setundeferror")
 		a := m.Pop()

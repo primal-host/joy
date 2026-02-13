@@ -3,14 +3,16 @@ package main
 import "fmt"
 
 type Parser struct {
-	tokens  []Token
-	pos     int
-	machine *Machine
-	scopes  []map[string]string // stack of {originalName → mangledName}
+	tokens         []Token
+	pos            int
+	machine        *Machine
+	scopes         []map[string]string // stack of {originalName → mangledName}
+	modulePrefix   string              // non-empty inside MODULE PUBLIC (e.g. "m1.")
+	moduleScopeIdx int                 // index of MODULE scope in scopes (-1 = not in module)
 }
 
 func NewParser(tokens []Token, m *Machine) *Parser {
-	return &Parser{tokens: tokens, pos: 0, machine: m}
+	return &Parser{tokens: tokens, pos: 0, machine: m, moduleScopeIdx: -1}
 }
 
 func (p *Parser) peek() Token {
@@ -54,6 +56,8 @@ func (p *Parser) Parse() []Value {
 			p.parseDefine()
 		case TokHide:
 			p.parseHide()
+		case TokModule:
+			p.parseModule()
 		default:
 			program = append(program, p.parseTerm()...)
 		}
@@ -106,8 +110,9 @@ func (p *Parser) parseHide() {
 		joyErr("expected IN after HIDE definitions")
 	}
 
-	// Parse public definitions until END (no mangling)
-	p.parseDefSequence("")
+	// Parse public definitions until END.
+	// Inside MODULE, propagate module prefix so public defs get module naming.
+	p.parseDefSequence(p.modulePrefix)
 
 	// Expect END
 	if !p.atEnd() && p.peek().Typ == TokEnd {
@@ -116,6 +121,84 @@ func (p *Parser) parseHide() {
 		joyErr("expected END after IN definitions")
 	}
 
+	p.popScope()
+}
+
+// parseModule handles MODULE name PRIVATE ... PUBLIC ... END.
+// Private defs are scope-mangled. Public defs are stored as moduleName.fieldName.
+func (p *Parser) parseModule() {
+	p.advance() // consume MODULE
+	if p.atEnd() || p.peek().Typ != TokAtom {
+		joyErr("expected module name after MODULE")
+	}
+	modName := p.advance().Str
+
+	scopeID := p.pushScope()
+	prefix := fmt.Sprintf("__scope_%d_", scopeID)
+
+	// Save and set module context
+	prevModPrefix := p.modulePrefix
+	prevModScope := p.moduleScopeIdx
+	p.modulePrefix = modName + "."
+	p.moduleScopeIdx = len(p.scopes) - 1
+
+	// Expect PRIVATE/HIDE
+	if !p.atEnd() && p.peek().Typ == TokHide {
+		p.advance()
+	} else {
+		joyErr("expected PRIVATE after MODULE %s", modName)
+	}
+
+	// Parse private definitions — stop at PUBLIC (TokDefine) or IN or END
+	for !p.atEnd() {
+		tok := p.peek()
+		if tok.Typ == TokDefine || tok.Typ == TokIn || tok.Typ == TokEnd || tok.Typ == TokDot {
+			break
+		}
+		if tok.Typ == TokHide {
+			p.parseHide()
+			continue
+		}
+		if tok.Typ != TokAtom {
+			joyErr("expected atom in MODULE PRIVATE, got %s", tok.Str)
+		}
+		name := p.advance().Str
+		if p.peek().Typ != TokEqDef {
+			joyErr("expected == after %s", name)
+		}
+		p.advance()
+
+		dictName := prefix + name
+		p.scopes[len(p.scopes)-1][name] = dictName
+
+		body := p.readBody()
+		p.machine.Dict[dictName] = body
+
+		if !p.atEnd() && p.peek().Typ == TokSemiCol {
+			p.advance()
+		}
+	}
+
+	// Expect PUBLIC (TokDefine) or IN
+	if !p.atEnd() && (p.peek().Typ == TokDefine || p.peek().Typ == TokIn) {
+		p.advance()
+	} else {
+		joyErr("expected PUBLIC after MODULE %s PRIVATE definitions", modName)
+	}
+
+	// Parse public definitions — store as moduleName.fieldName
+	p.parseDefSequence(p.modulePrefix)
+
+	// Expect END
+	if !p.atEnd() && p.peek().Typ == TokEnd {
+		p.advance()
+	} else {
+		joyErr("expected END for MODULE %s", modName)
+	}
+
+	// Restore module context and pop scope
+	p.modulePrefix = prevModPrefix
+	p.moduleScopeIdx = prevModScope
 	p.popScope()
 }
 
@@ -136,6 +219,10 @@ func (p *Parser) parseDefSequence(prefix string) {
 			p.advance() // consume DEFINE keyword (optional inside HIDE blocks)
 			continue
 		}
+		if tok.Typ == TokSemiCol {
+			p.advance() // consume stray semicolons (e.g. after HIDE...END;)
+			continue
+		}
 		if tok.Typ != TokAtom {
 			joyErr("expected atom in definition, got %s", tok.Str)
 		}
@@ -150,6 +237,10 @@ func (p *Parser) parseDefSequence(prefix string) {
 		if prefix != "" {
 			dictName = prefix + name
 			p.scopes[len(p.scopes)-1][name] = dictName
+			// Inside MODULE, also register in module scope so names survive nested HIDE pops
+			if p.moduleScopeIdx >= 0 && p.moduleScopeIdx < len(p.scopes)-1 {
+				p.scopes[p.moduleScopeIdx][name] = dictName
+			}
 		}
 
 		body := p.readBody()
@@ -167,7 +258,7 @@ func (p *Parser) readBody() []Value {
 	var body []Value
 	for !p.atEnd() {
 		tok := p.peek()
-		if tok.Typ == TokSemiCol || tok.Typ == TokDot || tok.Typ == TokIn || tok.Typ == TokEnd || tok.Typ == TokHide {
+		if tok.Typ == TokSemiCol || tok.Typ == TokDot || tok.Typ == TokIn || tok.Typ == TokEnd || tok.Typ == TokHide || tok.Typ == TokDefine || tok.Typ == TokModule {
 			break
 		}
 		// check if next atom looks like start of next definition (atom followed by ==)
