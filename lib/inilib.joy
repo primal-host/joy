@@ -1,51 +1,97 @@
 (* inilib.joy — Joy standard library initialization *)
 (* Adapted from the C reference implementation *)
 
-(* Stack manipulation shortcuts *)
+(* ===== Stack manipulation ===== *)
 DEFINE
-  popd    == [pop] dip ;
-  dupd    == [dup] dip ;
-  swapd   == [swap] dip ;
-  rollupd == [rollup] dip ;
-  id      == ;
-  pop2    == pop pop ;
-  pop3    == pop pop pop ;
-  dup2    == dup [dup] dip swap .
+  popd      == [pop] dip ;
+  dupd      == [dup] dip ;
+  swapd     == [swap] dip ;
+  rollupd   == [rollup] dip ;
+  rolldownd == [rolldown] dip ;
+  rotated   == [rotate] dip ;
+  id        == ;
+  pop2      == pop pop ;
+  pop3      == pop pop pop ;
+  dup2      == dup [dup] dip swap .
 
-(* Boolean / comparison helpers *)
+(* ===== Boolean / comparison helpers ===== *)
 DEFINE
-  not2    == not not ;
-  truth   == true ;
-  falsity == false ;
-  nullary2 == [nullary] dip nullary ;
-  nullary3 == [nullary2] dip nullary .
+  not2      == not not ;
+  truth     == true ;
+  falsity   == false ;
+  boolean   == [true] [false] branch .
 
-(* Arithmetic helpers *)
+(* ===== Arithmetic helpers ===== *)
 DEFINE
-  sqr     == dup * ;
-  cube    == dup dup * * ;
-  average == dup [+] fold swap size / ;
-  positive == 0 > ;
-  negative == 0 < ;
-  even    == 2 rem 0 = ;
-  odd     == even not .
+  sqr       == dup * ;
+  cube      == dup dup * * ;
+  positive  == 0 > ;
+  negative  == 0 < ;
+  even      == 2 rem 0 = ;
+  odd       == even not .
 
-(* Aggregate helpers *)
+(* ===== I/O helpers ===== *)
 DEFINE
-  sum     == 0 swap [+] fold ;
-  product == 1 swap [*] fold ;
-  swoncat == swap concat ;
-  shunt   == [swons] step ;
-  flatten == [] [concat] fold ;
-  second  == rest first ;
-  third   == rest rest first .
+  putln     == put newline ;
+  space     == '\032 putch ;
+  bell      == '\007 putch ;
+  putstrings == [putchars] step ;
+  ask       == putchars get .
 
-(* List construction *)
+(* ===== Character operations ===== *)
 DEFINE
-  unitlist == [] cons ;
-  unitstring == "" cons .
+  to-upper  == [dup 'a >= swap 'z <= and] ['a - 'A + chr] [] ifte ;
+  to-lower  == [dup 'A >= swap 'Z <= and] ['A - 'a + chr] [] ifte .
 
-(* Higher-order *)
+(* ===== Aggregate helpers ===== *)
+DEFINE
+  sum       == 0 swap [+] fold ;
+  product   == 1 swap [*] fold ;
+  swoncat   == swap concat ;
+  flatten   == [] [concat] fold ;
+  second    == rest first ;
+  third     == rest rest first ;
+  fourth    == rest rest rest first ;
+  fifth     == rest rest rest rest first .
+
+(* ===== List/string/set construction ===== *)
+DEFINE
+  unitlist   == [] cons ;
+  unitstring == "" cons ;
+  unitset    == {} cons .
+
+(* ===== Program operators ===== *)
+DEFINE
+  conjoin  == [[true] [false] ifte] cons cons ;
+  disjoin  == [[true] [false] ifte] cons [true] swoncat cons ;
+  negate   == [not] concat .
+
+(* ===== Combinator helpers ===== *)
+DEFINE
+  nullary2  == [nullary] dip nullary ;
+  nullary3  == [nullary2] dip nullary ;
+  dip2      == [dip] cons dip ;
+  dip3      == [dip2] cons dip ;
+  call      == i ;
+  i2        == [dip] dip i ;
+  repeat    == dupd swap [i] cons times pop ;
+  forever   == [dup i] swap concat dup i .
+
+(* ===== Higher-order ===== *)
 DEFINE
   twice   == dup concat i ;
   thrice  == dup dup concat concat i .
+
+(* ===== Date/time helpers ===== *)
+DEFINE
+  weekdays == ["Monday" "Tuesday" "Wednesday" "Thursday"
+               "Friday" "Saturday" "Sunday"] ;
+  months   == ["January" "February" "March" "April" "May" "June"
+               "July" "August" "September" "October" "November" "December"] .
+
+(* ===== Library loading ===== *)
+DEFINE
+  libload       == ".joy" concat include ;
+  verbose       == true .
+
+(* verbose is a flag used by libraries for optional output *)
