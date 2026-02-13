@@ -126,20 +126,26 @@ func init() {
 		if cases.Typ != TypeList {
 			joyErr("case: list expected")
 		}
-		for _, c := range cases.List {
-			if c.Typ == TypeList && len(c.List) >= 2 {
+		n := len(cases.List)
+		if n == 0 {
+			return
+		}
+		// Try all clauses except last (match cases)
+		for i := 0; i < n-1; i++ {
+			c := cases.List[i]
+			if c.Typ == TypeList && len(c.List) >= 1 {
 				if c.List[0].Equal(x) {
+					// Match: pop both X and case-list (already done), execute body
 					m.Execute(c.List[1:])
 					return
 				}
 			}
 		}
-		// default: last element
-		if len(cases.List) > 0 {
-			last := cases.List[len(cases.List)-1]
-			if last.Typ == TypeList {
-				m.Execute(last.List)
-			}
+		// Default (last element): X stays on stack, execute entire clause
+		m.Push(x)
+		last := cases.List[n-1]
+		if last.Typ == TypeList {
+			m.Execute(last.List)
 		}
 	})
 

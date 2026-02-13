@@ -258,7 +258,7 @@ func init() {
 		}
 	})
 
-	// map: A [P] -> B — apply P to each element
+	// map: A [P] -> B — apply P to each element (SAVESTACK: restores stack between iterations)
 	register("map", func(m *Machine) {
 		m.NeedStack(2, "map")
 		q := m.Pop()
@@ -266,18 +266,26 @@ func init() {
 		if q.Typ != TypeList {
 			joyErr("map: quotation expected")
 		}
+		savedStack := make([]Value, len(m.Stack))
+		copy(savedStack, m.Stack)
 		switch agg.Typ {
 		case TypeList:
 			result := make([]Value, 0, len(agg.List))
 			for _, item := range agg.List {
+				m.Stack = make([]Value, len(savedStack))
+				copy(m.Stack, savedStack)
 				m.Push(item)
 				m.Execute(q.List)
 				result = append(result, m.Pop())
 			}
+			m.Stack = make([]Value, len(savedStack))
+			copy(m.Stack, savedStack)
 			m.Push(ListVal(result))
 		case TypeString:
 			var result []byte
 			for _, ch := range agg.Str {
+				m.Stack = make([]Value, len(savedStack))
+				copy(m.Stack, savedStack)
 				m.Push(CharVal(int64(ch)))
 				m.Execute(q.List)
 				r := m.Pop()
@@ -285,11 +293,15 @@ func init() {
 					result = append(result, byte(r.Int))
 				}
 			}
+			m.Stack = make([]Value, len(savedStack))
+			copy(m.Stack, savedStack)
 			m.Push(StringVal(string(result)))
 		case TypeSet:
 			var bits int64
 			for i := 0; i < SetSize; i++ {
 				if agg.Int&(1<<i) != 0 {
+					m.Stack = make([]Value, len(savedStack))
+					copy(m.Stack, savedStack)
 					m.Push(IntVal(int64(i)))
 					m.Execute(q.List)
 					r := m.Pop()
@@ -298,6 +310,8 @@ func init() {
 					}
 				}
 			}
+			m.Stack = make([]Value, len(savedStack))
+			copy(m.Stack, savedStack)
 			m.Push(SetVal(bits))
 		default:
 			joyErr("map: aggregate expected")

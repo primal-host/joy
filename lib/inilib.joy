@@ -75,7 +75,7 @@ DEFINE
   nullary3  == [nullary2] dip nullary ;
   dip2      == [dip] cons dip ;
   dip3      == [dip2] cons dip ;
-  call      == i ;
+  call      == [] cons i ;
   i2        == [dip] dip i ;
   repeat    == dupd swap [i] cons times pop ;
   forever   == [dup i] swap concat dup i .
