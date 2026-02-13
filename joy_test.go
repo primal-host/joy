@@ -1631,5 +1631,322 @@ func TestInilibSequor(t *testing.T) {
 	}
 }
 
+// ============== Reference Library Tests ==============
+// Tests for Phase 5b libraries, derived from reference test files.
+
+func loadLib(t *testing.T, m *Machine, lib string) {
+	t.Helper()
+	if err := m.RunLine(fmt.Sprintf(`"%s" libload`, lib)); err != nil {
+		t.Fatalf("load %s: %v", lib, err)
+	}
+}
+
+func TestRefMtrlib(t *testing.T) {
+	m := newMachineWithStdlib(t)
+	loadLib(t, m, "mtrlib")
+	loadLib(t, m, "numlib")
+	tests := []struct {
+		input  string
+		expect string
+	}{
+		{`5 "hello" n-e-vector .`, "[\"hello\" \"hello\" \"hello\" \"hello\" \"hello\"]\n"},
+		{`5 1 n-e-vector .`, "[1 1 1 1 1]\n"},
+		{`5 [1 2 3] [+]sv-bin-v .`, "[6 7 8]\n"},
+		{`[1 2 3] [10 20 30] [+]vv-bin-v .`, "[11 22 33]\n"},
+		{`[1 2 3] [1 2 3] [*][+]vv-2bin-s .`, "14\n"},
+		{`[1 2 3 4] v-1row-m .`, "[[1 2 3 4]]\n"},
+		{`[1 2 3 4] v-1col-m .`, "[[1] [2] [3] [4]]\n"},
+		{`[1 2 3 4] v-zdiag-m .`, "[[1 0 0 0] [0 2 0 0] [0 0 3 0] [0 0 0 4]]\n"},
+		{`[[1 2] [3 4]] [[5 6] [7 8]] mm-vercat-m .`, "[[1 2] [3 4] [5 6] [7 8]]\n"},
+		{`[[1 2] [3 4]] [[5 6] [7 8]] mm-horcat-m .`, "[[1 2 5 6] [3 4 7 8]]\n"},
+		{`[[1 2 3] [4 5 6] [7 8 9] [10 11 12]] m-transpose-m .`, "[[1 4 7 10] [2 5 8 11] [3 6 9 12]]\n"},
+		{`[[1 2] [3 4] [5 6]] 10 [+]ms-cbin-m .`, "[[11 12] [13 14] [15 16]]\n"},
+		{`[[1 2 3] [4 5 6]] [[10 20 30] [40 50 60]] mm-add-m .`, "[[11 22 33] [44 55 66]]\n"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			out := captureOutput(func() {
+				if err := m.RunLine(tt.input); err != nil {
+					t.Fatalf("error: %v", err)
+				}
+			})
+			if out != tt.expect {
+				t.Errorf("got %q, want %q", out, tt.expect)
+			}
+		})
+	}
+}
+
+func TestRefMthlib(t *testing.T) {
+	m := newMachineWithStdlib(t)
+	loadLib(t, m, "mthlib")
+	tests := []struct {
+		input  string
+		expect string
+	}{
+		// calc uses Cambridge Polish (prefix) notation
+		{`[+ 3 4] calc .`, "7\n"},
+		{`[* 3 4] calc .`, "12\n"},
+		{`[- 10 3] calc .`, "7\n"},
+		{`[+ [* 2 3] [- 10 4]] calc .`, "12\n"},
+		// diff: differentiate with respect to variable
+		{`[a] [* 3 a] diff .`, "3\n"},
+		{`[a] [+ a a] diff .`, "2\n"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			out := captureOutput(func() {
+				if err := m.RunLine(tt.input); err != nil {
+					t.Fatalf("error: %v", err)
+				}
+			})
+			if out != tt.expect {
+				t.Errorf("got %q, want %q", out, tt.expect)
+			}
+		})
+	}
+}
+
+func TestRefSymlib(t *testing.T) {
+	m := newMachineWithStdlib(t)
+	loadLib(t, m, "symlib")
+	if err := m.RunLine(`DEFINE unops == [not succ pred fact fib first rest reverse i intern]`); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.RunLine(`DEFINE binops == [and or + - * / = < > cons concat map filter]`); err != nil {
+		t.Fatal(err)
+	}
+	tests := []struct {
+		input  string
+		expect string
+	}{
+		// Rev2Cam: Reverse Polish to Cambridge
+		{`[2 3 * 4 5 + -] Rev2Cam .`, "[- [* 2 3] [+ 4 5]]\n"},
+		// Rev2Tre: Reverse Polish to Tree (atoms wrapped in lists)
+		{`[2 3 * 4 5 + -] Rev2Tre .`, "[- [* [2] [3]] [+ [4] [5]]]\n"},
+		// Cam2Rev: Cambridge to Reverse Polish
+		{`[+ 2 3] Cam2Rev .`, "[2 3 +]\n"},
+		{`[- [* 2 3] [+ 4 5]] Cam2Rev .`, "[2 3 * 4 5 + -]\n"},
+		// Cam2Tre: Cambridge to Tree
+		{`[+ 2 3] Cam2Tre .`, "[+ [2] [3]]\n"},
+		// Rev2Inf: Reverse Polish to Infix (binaries wrapped in lists)
+		{`[2 3 +] Rev2Inf .`, "[[2 + 3]]\n"},
+		{`[2 3 * 4 5 + -] Rev2Inf .`, "[[[2 * 3] - [4 + 5]]]\n"},
+		// Cam2Rev followed by eval
+		{`[- [* 2 3] [+ 4 5]] Cam2Rev i .`, "-3\n"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			out := captureOutput(func() {
+				if err := m.RunLine(tt.input); err != nil {
+					t.Fatalf("error: %v", err)
+				}
+			})
+			if out != tt.expect {
+				t.Errorf("got %q, want %q", out, tt.expect)
+			}
+		})
+	}
+}
+
+func TestRefGrmlib(t *testing.T) {
+	m := newMachineWithStdlib(t)
+	loadLib(t, m, "grmlib")
+	// Define grammars from reference grmtst.joy
+	setup := []string{
+		`DEFINE prs-trace == pop`,
+		`DEFINE tree == [ "big" _ "tree" ]`,
+		`DEFINE names == [ "peter" _ "smith" | "paul" _ "jones" | "mary" _ "robinson" ]`,
+		`DEFINE anyname == [ ["peter" | "paul" | "mary"] _ ["smith" | "jones" | "robinson"] ]`,
+		`DEFINE arith == [ "x" | "(" _ $ arith _ "+" _ $ arith _ ")" ]`,
+	}
+	for _, s := range setup {
+		if err := m.RunLine(s); err != nil {
+			t.Fatalf("setup %q: %v", s, err)
+		}
+	}
+	tests := []struct {
+		input  string
+		expect string
+	}{
+		// Parsing tests from grmtst.joy
+		{`["big" "tree"] tree prs-test .`, "true\n"},
+		{`["peter" "smith"] names prs-test .`, "true\n"},
+		{`["paul" "jones"] names prs-test .`, "true\n"},
+		{`["mary" "robinson"] names prs-test .`, "true\n"},
+		{`["fred"] names prs-test .`, "false\n"},
+		{`["peter" "robinson"] anyname prs-test .`, "true\n"},
+		{`["paul" "smith"] anyname prs-test .`, "true\n"},
+		{`["paul" "nurks"] anyname prs-test .`, "false\n"},
+		{`["fred" "nurks"] anyname prs-test .`, "false\n"},
+		// $ (non-terminal call) in parsing
+		{`["mary" "robinson"] [$ anyname] prs-test .`, "true\n"},
+		{`["mary" "robertson"] [$ anyname] prs-test .`, "false\n"},
+		// prs-count: count matching prefixes
+		{`["*" "*" "*" "*" "*" "."] [* "*"] prs-count .`, "6\n"},
+		{`["*" "*" "*" "." "*" "*"] [* "*"] prs-count .`, "4\n"},
+		{`["*" "*" "*" "." "*" "*"] [+ "*"] prs-count .`, "3\n"},
+		// Generation: gen-accumulate collects generated strings
+		{`8 ["The" _ ["cat" | "dog"] _ "sat" _ "on" _ "the" _ ["mat" | "lawn"]] gen-accumulate size .`, "4\n"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			out := captureOutput(func() {
+				if err := m.RunLine(tt.input); err != nil {
+					t.Fatalf("error: %v", err)
+				}
+			})
+			if out != tt.expect {
+				t.Errorf("got %q, want %q", out, tt.expect)
+			}
+		})
+	}
+}
+
+func TestRefPlglib(t *testing.T) {
+	m := newMachineWithStdlib(t)
+	loadLib(t, m, "plglib")
+	tests := []struct {
+		input  string
+		expect string
+	}{
+		{`[p or not p] Min2Tre taut-test .`, "true\n"},
+		{`[p and not p] Min2Tre taut-test .`, "false\n"},
+		{`[p imp p] Min2Tre taut-test .`, "true\n"},
+		{`[[p imp q] imp [not q imp not p]] Min2Tre taut-test .`, "true\n"},
+		{`[[p and q] imp p] Min2Tre taut-test .`, "true\n"},
+		{`[p imp [p or q]] Min2Tre taut-test .`, "true\n"},
+		{`[[[p imp q] and [q imp r]] imp [p imp r]] Min2Tre taut-test .`, "true\n"},
+		{`[[p iff q] iff [q iff p]] Min2Tre taut-test .`, "true\n"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			out := captureOutput(func() {
+				if err := m.RunLine(tt.input); err != nil {
+					t.Fatalf("error: %v", err)
+				}
+			})
+			if out != tt.expect {
+				t.Errorf("got %q, want %q", out, tt.expect)
+			}
+		})
+	}
+}
+
+func TestRefLsplib(t *testing.T) {
+	m := newMachineWithStdlib(t)
+	loadLib(t, m, "lsplib")
+	// Each test runs eval with lib0 as environment
+	if err := m.RunLine("DEFINE lenv == lib0"); err != nil {
+		t.Fatal(err)
+	}
+	tests := []struct {
+		input  string
+		expect string
+	}{
+		{`lenv [QUOTE [Peter Paul Mary]] eval .`, "[Peter Paul Mary]\n"},
+		{`lenv [CAR [QUOTE [Peter Paul Mary]]] eval .`, "Peter\n"},
+		{`lenv [CDR [QUOTE [1 2 3 4 5]]] eval .`, "[2 3 4 5]\n"},
+		{`lenv [CONS Fred [QUOTE [Peter Paul]]] eval .`, "[Fred Peter Paul]\n"},
+		{`lenv [ATOM Fred] eval .`, "true\n"},
+		{`lenv [NULL [QUOTE []]] eval .`, "true\n"},
+		{`lenv [EQ 2 3] eval .`, "false\n"},
+		{`lenv [+ [* 2 5] [- 10 7]] eval .`, "13\n"},
+		{`lenv [and true false] eval .`, "false\n"},
+		{`lenv [or true false] eval .`, "true\n"},
+		{`lenv [[LAMBDA [lis] CAR [CDR lis]] [QUOTE [11 22 33]]] eval .`, "22\n"},
+		// FOLDR test
+		{`lenv [FOLDR [QUOTE [a b c]] [QUOTE [d e]] [LAMBDA [x y] CONS x y]] eval .`, "[a b c d e]\n"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			out := captureOutput(func() {
+				if err := m.RunLine(tt.input); err != nil {
+					t.Fatalf("error: %v", err)
+				}
+			})
+			if out != tt.expect {
+				t.Errorf("got %q, want %q", out, tt.expect)
+			}
+		})
+	}
+}
+
+func TestRefReplib(t *testing.T) {
+	m := newMachineWithStdlib(t)
+	loadLib(t, m, "replib")
+	// Define helpers from reptst.joy
+	setup := []string{
+		`DEFINE fact0 == [[pop null] [pop pop 1] [[dup pred] dip i *] ifte]`,
+		`DEFINE fact == [[pop null] [[pop 1] dip] [[dup pred] dip i [*] dip] ifte]`,
+		`DEFINE state == first first`,
+		`DEFINE ones == 1 rep.c-stream`,
+		`DEFINE integers == rep.ints`,
+		`DEFINE nfib == [[pop small] [[pop 1] dip] [[pred dup pred] dip dip swap i [+] dip] ifte]`,
+		`DEFINE nfib-fix == nfib rep.fix`,
+		`DEFINE fact-lin == [null] [pop 1] [dup pred] [*] rep.linear`,
+		`DEFINE fact-fix == fact-lin rep.fix`,
+	}
+	for _, s := range setup {
+		if err := m.RunLine(s); err != nil {
+			t.Fatalf("setup %q: %v", s, err)
+		}
+	}
+	tests := []struct {
+		input  string
+		expect string
+	}{
+		// squaring via exe
+		{`2 [dup *] rep.exe i pop .`, "4\n"},
+		{`2 [dup *] rep.exe i i pop .`, "16\n"},
+		{`2 [dup *] rep.exe i i i pop .`, "256\n"},
+		// factorial via fix (fact0 — simple version)
+		{`6 fact0 rep.fix i .`, "720\n"},
+		// factorial via fix (fact — leaves trace on stack)
+		{`6 fact rep.fix i pop .`, "720\n"},
+		// integers stream
+		{`integers i i i i i state .`, "5\n"},
+		// ones stream
+		{`ones i i i i i state .`, "1\n"},
+		// nfib
+		{`6 nfib-fix i pop .`, "13\n"},
+		// linear convenience
+		{`4 fact-fix i pop .`, "24\n"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			out := captureOutput(func() {
+				if err := m.RunLine(tt.input); err != nil {
+					t.Fatalf("error: %v", err)
+				}
+			})
+			if out != tt.expect {
+				t.Errorf("got %q, want %q", out, tt.expect)
+			}
+		})
+	}
+}
+
+func TestRefFraclib(t *testing.T) {
+	m := newMachineWithStdlib(t)
+	loadLib(t, m, "fraclib")
+	// Just test that mandel runs without error and produces output
+	out := captureOutput(func() {
+		if err := m.RunLine("mandel"); err != nil {
+			t.Fatalf("error: %v", err)
+		}
+	})
+	// Mandelbrot should produce 30 lines of 75 chars each
+	lines := strings.Split(strings.TrimRight(out, "\n"), "\n")
+	if len(lines) != 30 {
+		t.Errorf("expected 30 lines, got %d", len(lines))
+	}
+	for i, line := range lines {
+		if len(line) != 75 {
+			t.Errorf("line %d: expected 75 chars, got %d", i, len(line))
+		}
+	}
+}
+
 // Silence unused import warning for fmt
 var _ = fmt.Sprint
