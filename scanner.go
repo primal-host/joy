@@ -21,6 +21,9 @@ const (
 	TokDot                      // .  (auto-put)
 	TokSemiCol                  // ;
 	TokDefine                   // DEFINE keyword
+	TokHide                     // HIDE, PRIVATE
+	TokIn                       // IN
+	TokEnd                      // END
 	TokEqDef                    // ==
 	TokEOF
 )
@@ -286,6 +289,12 @@ func (s *Scanner) scanAtom() Token {
 	switch text {
 	case "DEFINE", "PUBLIC", "LIBRA":
 		return Token{Typ: TokDefine, Str: text}
+	case "HIDE", "PRIVATE":
+		return Token{Typ: TokHide, Str: text}
+	case "IN":
+		return Token{Typ: TokIn, Str: text}
+	case "END":
+		return Token{Typ: TokEnd, Str: text}
 	case "==":
 		return Token{Typ: TokEqDef, Str: text}
 	default:
