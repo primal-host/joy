@@ -18,6 +18,8 @@ type Machine struct {
 	LibPaths   []string         // search directories for .joy files
 	Included   map[string]bool  // include guard (resolved path → loaded)
 	Input      *bufio.Scanner   // input scanner for get builtin
+	Depth      int              // current recursion depth
+	MaxDepth   int              // maximum recursion depth (0 = use default)
 }
 
 func NewMachine() *Machine {
@@ -56,7 +58,23 @@ func (m *Machine) NeedStack(n int, name string) {
 	}
 }
 
+const defaultMaxDepth = 10000
+
+func (m *Machine) maxDepth() int {
+	if m.MaxDepth > 0 {
+		return m.MaxDepth
+	}
+	return defaultMaxDepth
+}
+
 func (m *Machine) Execute(program []Value) {
+	m.Depth++
+	if m.Depth > m.maxDepth() {
+		m.Depth--
+		joyErr("recursion depth exceeded (%d)", m.maxDepth())
+	}
+	defer func() { m.Depth-- }()
+
 	for {
 		for i, v := range program {
 			switch v.Typ {
