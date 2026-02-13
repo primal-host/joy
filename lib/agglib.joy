@@ -1,0 +1,54 @@
+(* agglib.joy — Aggregate library *)
+(* Adapted from the C reference implementation *)
+(* Requires: inilib *)
+
+(* ===== Stack helper ===== *)
+DEFINE
+  over == [dup] dip swap .   (* X Y -> X Y X *)
+
+(* ===== Unit constructors ===== *)
+DEFINE
+  pairlist   == [] cons cons ;
+  pairstring == "" cons cons ;
+  pairset    == {} cons cons .
+
+(* ===== Access ===== *)
+DEFINE
+  unpair  == uncons first .
+
+(* ===== Conversions ===== *)
+DEFINE
+  string2set == {} swap [cons] step ;
+  set2string == "" swap [cons] step ;
+  elements   == {} swap [cons] fold .
+
+(* ===== Dipped variants ===== *)
+DEFINE
+  nulld    == [null]    dip ;
+  consd    == [cons]    dip ;
+  swonsd   == [swons]   dip ;
+  unconsd  == [uncons]  dip ;
+  unswonsd == [unswons] dip ;
+  firstd   == [first]   dip ;
+  restd    == [rest]    dip ;
+  sized    == [size]    dip .
+
+(* ===== Two-operand ===== *)
+DEFINE
+  null2    == nulld null ;
+  cons2    == swapd cons [cons] dip ;
+  swons2   == swapd swons [swons] dip ;
+  unswons2 == unswonsd unswons .
+
+(* ===== Range generators ===== *)
+DEFINE
+  from-to == (* I J -> [I ... J] *)
+    [>] [pop pop []] [dupd [succ] dip from-to cons] ifte ;
+  from-to-list == from-to ;
+  from-to-set == from-to {} swap [cons] fold ;
+  from-to-string == from-to "" swap [cons] fold .
+
+(* ===== Statistics ===== *)
+DEFINE
+  average  == dup [sum] dip size / ;
+  variance == dup average swap [dup *] map average swap dup * - .

@@ -12,7 +12,7 @@ DEFINE
   id        == ;
   pop2      == pop pop ;
   pop3      == pop pop pop ;
-  dup2      == dup [dup] dip swap .
+  dup2      == [dup] dip dup [swap] dip .
 
 (* ===== Boolean / comparison helpers ===== *)
 DEFINE
