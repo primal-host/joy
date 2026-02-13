@@ -10,6 +10,7 @@ type Machine struct {
 	Stack   []Value
 	Dict    map[string][]Value
 	Autoput int // 0=off, 1=. (print top), 2=.. (print stack)
+	ScopeID int // counter for HIDE/IN/END scope name mangling
 }
 
 func NewMachine() *Machine {
