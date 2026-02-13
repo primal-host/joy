@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"math"
+	"os"
 	"strings"
 )
 
@@ -16,6 +17,7 @@ const (
 	TypeString
 	TypeSet     // 32-bit bitmask stored in Int
 	TypeList    // quotations are lists
+	TypeFile    // carries *os.File
 	TypeBuiltin // carries Fn + Name
 	TypeUserDef // carries Name, resolved at execution time
 )
@@ -31,6 +33,7 @@ type Value struct {
 	Str  string      // String, UserDef name, Builtin name
 	List []Value     // List / Quotation
 	Fn   BuiltinFunc // Builtin
+	File *os.File    // File
 }
 
 func BoolVal(b bool) Value {
@@ -69,6 +72,10 @@ func BuiltinVal(name string, fn BuiltinFunc) Value {
 	return Value{Typ: TypeBuiltin, Str: name, Fn: fn}
 }
 
+func FileVal(f *os.File, name string) Value {
+	return Value{Typ: TypeFile, File: f, Str: name}
+}
+
 func UserDefVal(name string) Value {
 	return Value{Typ: TypeUserDef, Str: name}
 }
@@ -87,6 +94,8 @@ func (v Value) IsTruthy() bool {
 		return len(v.List) > 0
 	case TypeSet:
 		return v.Int != 0
+	case TypeFile:
+		return v.File != nil
 	default:
 		return true
 	}
@@ -113,6 +122,8 @@ func (v Value) Equal(other Value) bool {
 			}
 		}
 		return true
+	case TypeFile:
+		return v.File == other.File
 	case TypeBuiltin:
 		return v.Str == other.Str
 	case TypeUserDef:
@@ -235,6 +246,11 @@ func (v Value) String() string {
 			parts = append(parts, item.String())
 		}
 		return "[" + strings.Join(parts, " ") + "]"
+	case TypeFile:
+		if v.File == nil {
+			return "file:nil"
+		}
+		return "file:" + v.Str
 	case TypeBuiltin:
 		return v.Str
 	case TypeUserDef:
