@@ -54,4 +54,10 @@ func init() {
 		a := m.Pop()
 		m.Push(BoolVal(a.Typ == TypeUserDef))
 	})
+
+	register("file", func(m *Machine) {
+		m.NeedStack(1, "file")
+		a := m.Pop()
+		m.Push(BoolVal(a.Typ == TypeFile))
+	})
 }
