@@ -1303,5 +1303,191 @@ func TestEmbeddedInilib(t *testing.T) {
 	}
 }
 
+// newMachineWithStdlib creates a machine with inilib pre-loaded.
+func newMachineWithStdlib(t *testing.T) *Machine {
+	t.Helper()
+	m := NewMachine()
+	if err := m.RunFile("inilib.joy"); err != nil {
+		t.Fatalf("load inilib: %v", err)
+	}
+	return m
+}
+
+func TestLibAgglib(t *testing.T) {
+	m := newMachineWithStdlib(t)
+	if err := m.RunLine(`"agglib" libload`); err != nil {
+		t.Fatalf("load agglib: %v", err)
+	}
+	tests := []struct {
+		input  string
+		expect string
+	}{
+		{"1 2 pairlist .", "[1 2]\n"},
+		{"[1 2 3] unpair .", "2\n"},
+		{"1 5 from-to .", "[1 2 3 4 5]\n"},
+		{"[10 20 30] average .", "20\n"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			out := captureOutput(func() {
+				if err := m.RunLine(tt.input); err != nil {
+					t.Fatalf("error: %v", err)
+				}
+			})
+			if out != tt.expect {
+				t.Errorf("got %q, want %q", out, tt.expect)
+			}
+		})
+	}
+}
+
+func TestLibSeqlib(t *testing.T) {
+	m := newMachineWithStdlib(t)
+	if err := m.RunLine(`"seqlib" libload`); err != nil {
+		t.Fatalf("load seqlib: %v", err)
+	}
+	tests := []struct {
+		input  string
+		expect string
+	}{
+		{"[5 3 1 4 2] qsort .", "[1 2 3 4 5]\n"},
+		{"[1 2 3] reverselist .", "[3 2 1]\n"},
+		{`"abc" reversestring .`, "\"cba\"\n"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			out := captureOutput(func() {
+				if err := m.RunLine(tt.input); err != nil {
+					t.Fatalf("error: %v", err)
+				}
+			})
+			if out != tt.expect {
+				t.Errorf("got %q, want %q", out, tt.expect)
+			}
+		})
+	}
+}
+
+func TestLibNumlib(t *testing.T) {
+	m := newMachineWithStdlib(t)
+	if err := m.RunLine(`"numlib" libload`); err != nil {
+		t.Fatalf("load numlib: %v", err)
+	}
+	tests := []struct {
+		input  string
+		expect string
+	}{
+		{"5 fact .", "120\n"},
+		{"7 prime .", "true\n"},
+		{"20 prime .", "false\n"},
+		{"4 even .", "true\n"},
+		{"3 odd .", "true\n"},
+		{"12 8 gcd .", "4\n"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			out := captureOutput(func() {
+				if err := m.RunLine(tt.input); err != nil {
+					t.Fatalf("error: %v", err)
+				}
+			})
+			if out != tt.expect {
+				t.Errorf("got %q, want %q", out, tt.expect)
+			}
+		})
+	}
+}
+
+func TestLibLazlib(t *testing.T) {
+	m := newMachineWithStdlib(t)
+	if err := m.RunLine(`"lazlib" libload`); err != nil {
+		t.Fatalf("load lazlib: %v", err)
+	}
+	tests := []struct {
+		input  string
+		expect string
+	}{
+		{"3 From 5 Take .", "[3 4 5 6 7]\n"},
+		{"Naturals 10 N-th .", "10\n"},
+		{"Ones 3 Take .", "[1 1 1]\n"},
+		{"Naturals 3 Drop 4 Take .", "[3 4 5 6]\n"},
+		{"Naturals [dup *] Map 5 Take .", "[0 1 4 9 16]\n"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			out := captureOutput(func() {
+				if err := m.RunLine(tt.input); err != nil {
+					t.Fatalf("error: %v", err)
+				}
+			})
+			if out != tt.expect {
+				t.Errorf("got %q, want %q", out, tt.expect)
+			}
+		})
+	}
+}
+
+func TestLibLazlibFilter(t *testing.T) {
+	m := newMachineWithStdlib(t)
+	if err := m.RunLine(`"lazlib" libload`); err != nil {
+		t.Fatalf("load lazlib: %v", err)
+	}
+	if err := m.RunLine(`"numlib" libload`); err != nil {
+		t.Fatalf("load numlib: %v", err)
+	}
+	tests := []struct {
+		input  string
+		expect string
+	}{
+		{"Positives [even] Filter 5 Take .", "[2 4 6 8 10]\n"},
+		{"Positives [prime] Filter 5 Take .", "[2 3 5 7 11]\n"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			out := captureOutput(func() {
+				if err := m.RunLine(tt.input); err != nil {
+					t.Fatalf("error: %v", err)
+				}
+			})
+			if out != tt.expect {
+				t.Errorf("got %q, want %q", out, tt.expect)
+			}
+		})
+	}
+}
+
+func TestLibTyplib(t *testing.T) {
+	m := newMachineWithStdlib(t)
+	if err := m.RunLine(`"typlib" libload`); err != nil {
+		t.Fatalf("load typlib: %v", err)
+	}
+	tests := []struct {
+		input  string
+		expect string
+	}{
+		// Stack ADT
+		{"st_new 1 st_push 2 st_push 3 st_push st_top .", "3\n"},
+		// Big sets
+		{"bs_new 5 bs_insert 3 bs_insert 7 bs_insert 1 bs_insert .", "[1 3 5 7]\n"},
+		{"[1 3 5 7] 3 bs_member .", "true\n"},
+		{"[1 3 5 7] 4 bs_member .", "false\n"},
+		{"[1 3 5] [3 5 7] bs_union .", "[1 3 5 7]\n"},
+		// Dictionary
+		{"d_new [1 \"one\"] d_add [2 \"two\"] d_add dup 2 d_look .", "[2 \"two\"]\n"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			out := captureOutput(func() {
+				if err := m.RunLine(tt.input); err != nil {
+					t.Fatalf("error: %v", err)
+				}
+			})
+			if out != tt.expect {
+				t.Errorf("got %q, want %q", out, tt.expect)
+			}
+		})
+	}
+}
+
 // Silence unused import warning for fmt
 var _ = fmt.Sprint
