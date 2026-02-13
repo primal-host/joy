@@ -1,14 +1,20 @@
 package main
 
 func init() {
-	// i: [P] -> ... — execute quotation
+	// i: [P] -> ... — execute quotation or builtin
 	register("i", func(m *Machine) {
 		m.NeedStack(1, "i")
 		q := m.Pop()
-		if q.Typ != TypeList {
+		switch q.Typ {
+		case TypeList:
+			m.Execute(q.List)
+		case TypeBuiltin:
+			q.Fn(m)
+		case TypeUserDef:
+			m.Execute([]Value{q})
+		default:
 			joyErr("i: quotation expected")
 		}
-		m.Execute(q.List)
 	})
 
 	// x: [P] -> [P] ... — execute quotation without removing it

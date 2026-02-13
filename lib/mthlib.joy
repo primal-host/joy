@@ -1,0 +1,89 @@
+(* mthlib.joy — Symbolic mathematics library *)
+(* Adapted from the C reference implementation *)
+(* Requires: basic-libload (agglib, numlib, seqlib) *)
+basic-libload
+
+DEFINE
+    _mthlib == true;
+
+(* "object oriented" lists *)
+    kons == [] cons cons [of] cons;
+    kar == 0 swap i;
+    kdr == 1 swap i;
+
+(* - - -   NUMERICAL CALCULATOR   - - - *)
+
+    calc ==
+        [ numerical ]
+        [ ]
+        [ unswons
+          [ dup [+ - * /] in ]
+          [ [ [calc] map uncons first ] dip
+            call ]
+          [ "bad operator\n" put ]
+          ifte ]
+        ifte;
+
+(* - - -   SYMBOLIC DIFFERENTIATION   - - - *)
+
+HIDE
+
+    _msum == pairlist [+] swoncat;
+    _makesum ==
+        [ [ [ [numerical] unary2 and ]
+            + ]
+          [ [ numerical ]
+            [0 =] [pop] [_msum] ifte ]
+          [ [ pop numerical ]
+            [pop 0 =] [popd] [_msum] ifte ]
+          [ _msum] ]
+        cond;
+
+    _mprod == pairlist [*] swoncat;
+    _makeproduct ==
+        [ [ [ [numerical] unary2 and ]
+            * ]
+          [ [ numerical ]
+            [ [ [0 =] popd ]
+              [ [1 =] pop ]
+              [ _mprod ] ]
+            cond ]
+          [ [ pop numerical ]
+            [ [ [pop 0 =] pop ]
+              [ [pop 1 =] popd ]
+              [ _mprod ] ]
+            cond ]
+          [ _mprod ] ]
+        cond
+
+IN
+
+    diff ==
+        [ [ [numerical]
+            pop pop 0 ]
+          [ [leaf]
+            [[first] dip = ]
+            [pop pop 1]
+            [pop pop 0]
+            ifte ]
+          [ [list]
+            unswons
+            [ [ +
+                pop unpair
+                [diff] unary2
+                _makesum popd ]
+              [ *
+                pop unpair
+                dup2
+                [[diff] unary2] dip2
+                rollup
+                _makeproduct [_makeproduct] dip
+                _makesum popd ]
+              [] ]
+            opcase i ]
+          [] ]
+        cond
+
+END;
+
+    MTHLIB == "mthlib.joy - symbolic mathematics library\n" .

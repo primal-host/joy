@@ -102,7 +102,7 @@ func init() {
 		}
 		for _, c := range cases.List {
 			if c.Typ == TypeList && len(c.List) > 0 {
-				if c.List[0].Typ == x.Typ {
+				if c.List[0].Equal(x) {
 					m.Push(ListVal(c.List[1:]))
 					return
 				}
