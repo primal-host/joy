@@ -20,7 +20,7 @@ type Machine struct {
 
 func NewMachine() *Machine {
 	return &Machine{
-		Stack:    nil,
+		Stack:    make([]Value, 0, 256),
 		Dict:     make(map[string][]Value),
 		Included: make(map[string]bool),
 	}
@@ -55,20 +55,29 @@ func (m *Machine) NeedStack(n int, name string) {
 }
 
 func (m *Machine) Execute(program []Value) {
-	for _, v := range program {
-		switch v.Typ {
-		case TypeBuiltin:
-			v.Fn(m)
-		case TypeUserDef:
-			body, ok := m.Dict[v.Str]
-			if !ok {
-				joyErr("undefined: %s", v.Str)
+	for {
+		for i, v := range program {
+			switch v.Typ {
+			case TypeBuiltin:
+				v.Fn(m)
+			case TypeUserDef:
+				body, ok := m.Dict[v.Str]
+				if !ok {
+					joyErr("undefined: %s", v.Str)
+				}
+				if i == len(program)-1 {
+					// Tail-call optimization: reuse loop instead of recursing
+					program = body
+					goto tailcall
+				}
+				m.Execute(body)
+			default:
+				// literal — push onto stack
+				m.Push(v)
 			}
-			m.Execute(body)
-		default:
-			// literal — push onto stack
-			m.Push(v)
 		}
+		return
+	tailcall:
 	}
 }
 
