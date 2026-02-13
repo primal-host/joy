@@ -19,7 +19,10 @@ DEFINE
   not2      == not not ;
   truth     == true ;
   falsity   == false ;
-  boolean   == [true] [false] branch .
+  sequor    == [pop true] swap ifte ;
+  sequand   == [pop false] ifte ;
+  numerical == [integer] [float] sequor ;
+  boolean   == [logical] [set] sequor .
 
 (* ===== Arithmetic helpers ===== *)
 DEFINE
@@ -92,6 +95,7 @@ DEFINE
 (* ===== Library loading ===== *)
 DEFINE
   libload       == ".joy" concat include ;
+  libinclude    == libload ;
   verbose       == true .
 
 (* verbose is a flag used by libraries for optional output *)

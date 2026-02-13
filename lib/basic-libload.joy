@@ -1,0 +1,4 @@
+(* basic-libload.joy — loads agglib, numlib, seqlib *)
+"agglib" libload
+"numlib" libload
+"seqlib" libload
