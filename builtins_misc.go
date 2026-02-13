@@ -143,6 +143,25 @@ func init() {
 		}
 	})
 
+	// REPL control
+	register("setautoput", func(m *Machine) {
+		m.NeedStack(1, "setautoput")
+		a := m.Pop()
+		m.Autoput = int(a.Int)
+	})
+
+	register("setecho", func(m *Machine) {
+		m.NeedStack(1, "setecho")
+		a := m.Pop()
+		m.Echo = int(a.Int)
+	})
+
+	register("setundeferror", func(m *Machine) {
+		m.NeedStack(1, "setundeferror")
+		a := m.Pop()
+		m.UndefError = int(a.Int)
+	})
+
 	register("help", func(m *Machine) {
 		fmt.Println("Joy interpreter — built-in operators:")
 		count := 0

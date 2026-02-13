@@ -9,13 +9,15 @@ import (
 )
 
 type Machine struct {
-	Stack    []Value
-	Dict     map[string][]Value
-	Autoput  int              // 0=off, 1=. (print top), 2=.. (print stack)
-	ScopeID  int              // counter for HIDE/IN/END scope name mangling
-	LibPaths []string         // search directories for .joy files
-	Included map[string]bool  // include guard (resolved path → loaded)
-	Input    *bufio.Scanner   // input scanner for get builtin
+	Stack      []Value
+	Dict       map[string][]Value
+	Autoput    int              // 0=off, 1=. (print top), 2=.. (print stack)
+	Echo       int              // 0=off, 1=on (echo input lines)
+	UndefError int              // 0=error on undefined, 1=ignore
+	ScopeID    int              // counter for HIDE/IN/END scope name mangling
+	LibPaths   []string         // search directories for .joy files
+	Included   map[string]bool  // include guard (resolved path → loaded)
+	Input      *bufio.Scanner   // input scanner for get builtin
 }
 
 func NewMachine() *Machine {

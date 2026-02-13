@@ -68,8 +68,15 @@ func main() {
 		if line == "" {
 			continue
 		}
+		if m.Echo > 0 {
+			fmt.Println(line)
+		}
 		if err := m.RunLine(line); err != nil {
 			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		} else if m.Autoput == 1 && len(m.Stack) > 0 {
+			fmt.Println(m.Stack[len(m.Stack)-1].String())
+		} else if m.Autoput == 2 && len(m.Stack) > 0 {
+			fmt.Println(m.PrintStack())
 		}
 	}
 	fmt.Println()
