@@ -60,4 +60,25 @@ func init() {
 		a := m.Pop()
 		m.Push(BoolVal(a.Typ == TypeFile))
 	})
+
+	// ifTYPE builtins: X [T] [F] ifTYPE -> ...
+	// If X matches TYPE, execute T; otherwise execute F. X stays on stack.
+	registerIfType := func(name string, typ ValueType) {
+		register(name, func(m *Machine) {
+			m.NeedStack(3, name)
+			fBranch := m.Pop()
+			tBranch := m.Pop()
+			if m.Peek().Typ == typ {
+				m.Execute(tBranch.List)
+			} else {
+				m.Execute(fBranch.List)
+			}
+		})
+	}
+	registerIfType("ifinteger", TypeInteger)
+	registerIfType("ifchar", TypeChar)
+	registerIfType("iffloat", TypeFloat)
+	registerIfType("ifstring", TypeString)
+	registerIfType("iflist", TypeList)
+	registerIfType("ifset", TypeSet)
 }
