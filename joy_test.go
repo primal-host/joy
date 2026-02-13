@@ -1489,5 +1489,147 @@ func TestLibTyplib(t *testing.T) {
 	}
 }
 
+func TestModule(t *testing.T) {
+	// Basic MODULE with PRIVATE/PUBLIC
+	t.Run("basic", func(t *testing.T) {
+		m := NewMachine()
+		src := `MODULE m1 PRIVATE a == "a"; b == "b" PUBLIC ab == a b concat; ba == b a concat; abba == ab ba concat END`
+		if err := m.RunLine(src); err != nil {
+			t.Fatalf("error: %v", err)
+		}
+		tests := []struct {
+			input  string
+			expect string
+		}{
+			{`m1.ab .`, "\"ab\"\n"},
+			{`m1.ba .`, "\"ba\"\n"},
+			{`m1.abba .`, "\"abba\"\n"},
+		}
+		for _, tt := range tests {
+			out := captureOutput(func() {
+				if err := m.RunLine(tt.input); err != nil {
+					t.Fatalf("error on %q: %v", tt.input, err)
+				}
+			})
+			if out != tt.expect {
+				t.Errorf("%s: got %q, want %q", tt.input, out, tt.expect)
+			}
+		}
+		// Private fields should NOT be accessible
+		err := m.RunLine("m1.a .")
+		if err == nil {
+			t.Error("expected error accessing private field m1.a")
+		}
+		err = m.RunLine("m1.b .")
+		if err == nil {
+			t.Error("expected error accessing private field m1.b")
+		}
+	})
+
+	// MODULE with nested HIDE in PUBLIC section
+	t.Run("nested_hide", func(t *testing.T) {
+		m := NewMachine()
+		src := `MODULE m2
+			PRIVATE a == "A"; b == "B"
+			PUBLIC
+				ab == a b concat; ba == b a concat;
+				abba == ab ba concat;
+				HIDE c == "C"; d == "D"
+				IN
+					cd == c d concat;
+					abc == a b concat c concat
+				END;
+				bcd == b cd concat
+			END`
+		if err := m.RunLine(src); err != nil {
+			t.Fatalf("error: %v", err)
+		}
+		tests := []struct {
+			input  string
+			expect string
+		}{
+			{`m2.ab .`, "\"AB\"\n"},
+			{`m2.ba .`, "\"BA\"\n"},
+			{`m2.abba .`, "\"ABBA\"\n"},
+			{`m2.cd .`, "\"CD\"\n"},
+			{`m2.abc .`, "\"ABC\"\n"},
+			{`m2.bcd .`, "\"BCD\"\n"},
+		}
+		for _, tt := range tests {
+			out := captureOutput(func() {
+				if err := m.RunLine(tt.input); err != nil {
+					t.Fatalf("error on %q: %v", tt.input, err)
+				}
+			})
+			if out != tt.expect {
+				t.Errorf("%s: got %q, want %q", tt.input, out, tt.expect)
+			}
+		}
+		// Private fields should NOT be accessible
+		for _, field := range []string{"m2.a", "m2.b", "m2.c", "m2.d"} {
+			err := m.RunLine(field + " .")
+			if err == nil {
+				t.Errorf("expected error accessing private field %s", field)
+			}
+		}
+	})
+
+	// Two MODULEs with same private names don't conflict
+	t.Run("no_conflict", func(t *testing.T) {
+		m := NewMachine()
+		src1 := `MODULE x PRIVATE val == 10 PUBLIC get == val END`
+		src2 := `MODULE y PRIVATE val == 20 PUBLIC get == val END`
+		if err := m.RunLine(src1); err != nil {
+			t.Fatalf("error: %v", err)
+		}
+		if err := m.RunLine(src2); err != nil {
+			t.Fatalf("error: %v", err)
+		}
+		out := captureOutput(func() {
+			if err := m.RunLine("x.get ."); err != nil {
+				t.Fatalf("error: %v", err)
+			}
+		})
+		if out != "10\n" {
+			t.Errorf("x.get: got %q, want %q", out, "10\n")
+		}
+		out = captureOutput(func() {
+			if err := m.RunLine("y.get ."); err != nil {
+				t.Fatalf("error: %v", err)
+			}
+		})
+		if out != "20\n" {
+			t.Errorf("y.get: got %q, want %q", out, "20\n")
+		}
+	})
+}
+
+func TestInilibSequor(t *testing.T) {
+	m := newMachineWithStdlib(t)
+	tests := []struct {
+		input  string
+		expect string
+	}{
+		{"42 numerical .", "true\n"},
+		{"3.14 numerical .", "true\n"},
+		{`"hello" numerical .`, "false\n"},
+		{"true boolean .", "true\n"},
+		{"{1 2 3} boolean .", "true\n"},
+		{"42 boolean .", "false\n"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			out := captureOutput(func() {
+				if err := m.RunLine(tt.input); err != nil {
+					t.Fatalf("error: %v", err)
+				}
+			})
+			if out != tt.expect {
+				t.Errorf("got %q, want %q", out, tt.expect)
+			}
+		})
+	}
+}
+
 // Silence unused import warning for fmt
 var _ = fmt.Sprint
