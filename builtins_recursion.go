@@ -121,9 +121,9 @@ func init() {
 				m.Execute(c.List)
 			}
 		case TypeList:
-			// Push each element (first to last)
-			for idx := len(x.List) - 1; idx >= 0; idx-- {
-				m.Push(x.List[idx])
+			// Push each element (first deepest, last on top)
+			for _, item := range x.List {
+				m.Push(item)
 			}
 			m.Execute(i.List)
 			for range x.List {
@@ -131,8 +131,8 @@ func init() {
 			}
 		case TypeString:
 			runes := []rune(x.Str)
-			for idx := len(runes) - 1; idx >= 0; idx-- {
-				m.Push(CharVal(int64(runes[idx])))
+			for _, r := range runes {
+				m.Push(CharVal(int64(r)))
 			}
 			m.Execute(i.List)
 			for range runes {
@@ -145,8 +145,8 @@ func init() {
 					members = append(members, bit)
 				}
 			}
-			for idx := len(members) - 1; idx >= 0; idx-- {
-				m.Push(IntVal(int64(members[idx])))
+			for _, mb := range members {
+				m.Push(IntVal(int64(mb)))
 			}
 			m.Execute(i.List)
 			for range members {

@@ -834,5 +834,239 @@ func TestHideInEnd(t *testing.T) {
 	})
 }
 
+func TestFloatMath(t *testing.T) {
+	tests := []struct {
+		input  string
+		expect string
+	}{
+		{"0.0 sin .", "0.0\n"},
+		{"0.0 cos .", "1.0\n"},
+		{"0.0 tan .", "0.0\n"},
+		{"100.0 log10 .", "2.0\n"},
+		{"2.0 10.0 pow .", "1024.0\n"},
+		{"1.0 exp .", "2.718281828459045\n"},
+		{"1.0 log .", "0.0\n"},
+		{"0.0 asin .", "0.0\n"},
+		{"1.0 acos .", "0.0\n"},
+		{"0.0 atan .", "0.0\n"},
+		{"1.0 1.0 atan2 .", "0.7853981633974483\n"},
+		{"0.5 3 ldexp .", "4.0\n"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			m := NewMachine()
+			out := captureOutput(func() {
+				if err := m.RunLine(tt.input); err != nil {
+					t.Fatalf("error: %v", err)
+				}
+			})
+			if out != tt.expect {
+				t.Errorf("got %q, want %q", out, tt.expect)
+			}
+		})
+	}
+}
+
+func TestFrexpModf(t *testing.T) {
+	// frexp: 8.0 -> 0.5 3
+	m := NewMachine()
+	out := captureOutput(func() {
+		if err := m.RunLine("8.0 frexp . ."); err != nil {
+			t.Fatalf("error: %v", err)
+		}
+	})
+	if out != "4\n0.5\n" {
+		t.Errorf("frexp: got %q, want %q", out, "4\n0.5\n")
+	}
+
+	// modf: 3.75 -> frac=0.75, int=3.0  (frac pushed first, then int on top)
+	m = NewMachine()
+	out = captureOutput(func() {
+		if err := m.RunLine("3.75 modf . ."); err != nil {
+			t.Fatalf("error: %v", err)
+		}
+	})
+	if out != "3.0\n0.75\n" {
+		t.Errorf("modf: got %q, want %q", out, "3.0\n0.75\n")
+	}
+}
+
+func TestRandom(t *testing.T) {
+	m := NewMachine()
+	out := captureOutput(func() {
+		// Seed with 42, get first random, seed again, should get same
+		if err := m.RunLine("42 srand rand ."); err != nil {
+			t.Fatalf("error: %v", err)
+		}
+	})
+	first := out
+	m = NewMachine()
+	out = captureOutput(func() {
+		if err := m.RunLine("42 srand rand ."); err != nil {
+			t.Fatalf("error: %v", err)
+		}
+	})
+	if out != first {
+		t.Errorf("srand/rand not deterministic: got %q then %q", first, out)
+	}
+}
+
+func TestPrimrec(t *testing.T) {
+	tests := []struct {
+		input  string
+		expect string
+	}{
+		// factorial: 5! = 120
+		{"5 [1] [*] primrec .", "120\n"},
+		// sum: 1+2+3 = 6
+		{"3 [0] [+] primrec .", "6\n"},
+		// list primrec: rebuild list
+		{"[1 2 3] [[]] [cons] primrec .", "[1 2 3]\n"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			m := NewMachine()
+			out := captureOutput(func() {
+				if err := m.RunLine(tt.input); err != nil {
+					t.Fatalf("error: %v", err)
+				}
+			})
+			if out != tt.expect {
+				t.Errorf("got %q, want %q", out, tt.expect)
+			}
+		})
+	}
+}
+
+func TestTreestep(t *testing.T) {
+	// Sum all leaves: [1 [2 3]] -> 1+2+3 = 6
+	m := NewMachine()
+	out := captureOutput(func() {
+		if err := m.RunLine("0 [1 [2 3]] [+] treestep ."); err != nil {
+			t.Fatalf("error: %v", err)
+		}
+	})
+	if out != "6\n" {
+		t.Errorf("got %q, want %q", out, "6\n")
+	}
+}
+
+func TestTreerec(t *testing.T) {
+	// Count leaves: [1 [2 [3 4]]] — 4 leaves
+	m := NewMachine()
+	out := captureOutput(func() {
+		if err := m.RunLine("[1 [2 [3 4]]] [pop 1] [+] treerec ."); err != nil {
+			t.Fatalf("error: %v", err)
+		}
+	})
+	if out != "4\n" {
+		t.Errorf("got %q, want %q", out, "4\n")
+	}
+}
+
+func TestSomeAll(t *testing.T) {
+	tests := []struct {
+		input  string
+		expect string
+	}{
+		{"[1 2 3] [3 =] some .", "true\n"},
+		{"[1 2 3] [5 =] some .", "false\n"},
+		{"[2 4 6] [2 rem 0 =] all .", "true\n"},
+		{"[2 4 5] [2 rem 0 =] all .", "false\n"},
+		{"[] [true] some .", "false\n"},
+		{"[] [false] all .", "true\n"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			m := NewMachine()
+			out := captureOutput(func() {
+				if err := m.RunLine(tt.input); err != nil {
+					t.Fatalf("error: %v", err)
+				}
+			})
+			if out != tt.expect {
+				t.Errorf("got %q, want %q", out, tt.expect)
+			}
+		})
+	}
+}
+
+func TestSort(t *testing.T) {
+	tests := []struct {
+		input  string
+		expect string
+	}{
+		{"[3 1 2] sort .", "[1 2 3]\n"},
+		{"[5 3 8 1 4] sort .", "[1 3 4 5 8]\n"},
+		{"[] sort .", "[]\n"},
+		{`"cab" sort .`, "\"abc\"\n"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.input, func(t *testing.T) {
+			m := NewMachine()
+			out := captureOutput(func() {
+				if err := m.RunLine(tt.input); err != nil {
+					t.Fatalf("error: %v", err)
+				}
+			})
+			if out != tt.expect {
+				t.Errorf("got %q, want %q", out, tt.expect)
+			}
+		})
+	}
+}
+
+func TestTimeBuiltins(t *testing.T) {
+	// 0 gmtime first -> 1970 (year)
+	m := NewMachine()
+	out := captureOutput(func() {
+		if err := m.RunLine("0 gmtime first ."); err != nil {
+			t.Fatalf("error: %v", err)
+		}
+	})
+	if out != "1970\n" {
+		t.Errorf("gmtime year: got %q, want %q", out, "1970\n")
+	}
+
+	// Round-trip: mktime(gmtime(0)) should preserve timestamp
+	// (may differ due to timezone, so use gmtime -> mktime with UTC)
+	m = NewMachine()
+	out = captureOutput(func() {
+		if err := m.RunLine("0 gmtime size ."); err != nil {
+			t.Fatalf("error: %v", err)
+		}
+	})
+	if out != "9\n" {
+		t.Errorf("gmtime list size: got %q, want %q", out, "9\n")
+	}
+}
+
+func TestGetenv(t *testing.T) {
+	m := NewMachine()
+	out := captureOutput(func() {
+		if err := m.RunLine(`"HOME" getenv size 0 > .`); err != nil {
+			t.Fatalf("error: %v", err)
+		}
+	})
+	if out != "true\n" {
+		t.Errorf("getenv HOME: got %q, want %q", out, "true\n")
+	}
+}
+
+func TestUndefs(t *testing.T) {
+	m := NewMachine()
+	if err := m.RunLine("DEFINE foo == bar baz ."); err != nil {
+		t.Fatalf("error: %v", err)
+	}
+	out := captureOutput(func() {
+		if err := m.RunLine("undefs size ."); err != nil {
+			t.Fatalf("error: %v", err)
+		}
+	})
+	if out != "2\n" {
+		t.Errorf("undefs: got %q, want %q", out, "2\n")
+	}
+}
+
 // Silence unused import warning for fmt
 var _ = fmt.Sprint
