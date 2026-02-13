@@ -1,0 +1,68 @@
+(* lazlib.joy — Lazy list library *)
+(* Adapted from the C reference implementation *)
+(*
+  A lazy list L is a quotation that, when executed (L i),
+  produces a 2-element list [head tail-quotation].
+  Convention: Capitalized names for lazy operations.
+*)
+
+(* ===== Constructors ===== *)
+DEFINE
+  From == (* N -> [lazy] — infinite list: N, N+1, N+2, ... *)
+    [dup succ From [] cons cons] cons .
+
+(* ===== Accessors ===== *)
+DEFINE
+  First  == i first ;                        (* [L] -> head *)
+  Rest   == i second ;                       (* [L] -> [tail] *)
+  Uncons == i uncons first swap .            (* [L] -> [tail] head *)
+
+(* ===== Core operations ===== *)
+DEFINE
+  Take == (* [L] N -> [list] — take first N elements *)
+    dup 0 <=
+    [pop pop []]
+    [pred swap Uncons [swap Take] dip swons]
+    branch ;
+
+  Drop == (* [L] N -> [L'] — drop first N elements *)
+    dup 0 <=
+    [pop]
+    [pred [Rest] dip Drop]
+    branch ;
+
+  N-th == (* [L] N -> element — 0-indexed *)
+    [0 <=] [pop First]
+    [pred [Rest] dip]
+    tailrec .
+
+(* ===== Lazy transformations ===== *)
+HIDE
+  _mf == (* [tail] head [F] -> [F(head) mapped-tail] *)
+    swap [dup] dip swap      (* [tail] [F] head [F] *)
+    i                        (* [tail] [F] F(head) *)
+    rollup                   (* F(head) [tail] [F] *)
+    Map                      (* F(head) mapped-lazy-tail *)
+    [] cons cons             (* [F(head) mapped-lazy-tail] *)
+  ;
+  _ff == (* [tail] head [P] -> [head filtered-tail] or recurse *)
+    dup [swap] dip           (* [tail] [P] head [P] *)
+    [dup] dip i              (* [tail] [P] head bool *)
+    [rollup Filter [] cons cons]
+    [pop Filter i]
+    branch
+IN
+  Map == (* [L] [F] -> [L'] — lazy map *)
+    [] cons cons
+    [uncons first swap i uncons first rollup swap _mf] cons ;
+
+  Filter == (* [L] [P] -> [L'] — lazy filter *)
+    [] cons cons
+    [uncons first swap i uncons first rollup swap _ff] cons
+END
+
+(* ===== Named sequences ===== *)
+DEFINE
+  Naturals   == 0 From ;
+  Positives  == 1 From ;
+  Ones       == [1 Ones [] cons cons] .
