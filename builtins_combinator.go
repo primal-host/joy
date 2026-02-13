@@ -508,6 +508,147 @@ func init() {
 		m.Push(ListVal(result))
 	})
 
+	// treestep: T [P] treestep — depth-first leaf traversal
+	// If leaf → push and execute P. If list → recurse on each child.
+	register("treestep", func(m *Machine) {
+		m.NeedStack(2, "treestep")
+		p := m.Pop()
+		t := m.Pop()
+		if p.Typ != TypeList {
+			joyErr("treestep: quotation expected")
+		}
+		treestepAux(m, t, p.List)
+	})
+
+	// treerec: T [O] [C] treerec — tree recursion
+	// If leaf → push T, execute O. If branch → recurse each child, execute C.
+	register("treerec", func(m *Machine) {
+		m.NeedStack(3, "treerec")
+		c := m.Pop()
+		o := m.Pop()
+		t := m.Pop()
+		if o.Typ != TypeList || c.Typ != TypeList {
+			joyErr("treerec: two quotations expected")
+		}
+		treerecAux(m, t, o.List, c.List)
+	})
+
+	// treegenrec: T [O1] [O2] [C] treegenrec — general tree recursion
+	// If leaf → push T, execute O1. If branch → push T, execute O2,
+	// push self-reference [O1 O2 C treegenrec], execute C.
+	var treegenrecFn BuiltinFunc
+	treegenrecFn = func(m *Machine) {
+		m.NeedStack(4, "treegenrec")
+		c := m.Pop()
+		o2 := m.Pop()
+		o1 := m.Pop()
+		t := m.Pop()
+		if o1.Typ != TypeList || o2.Typ != TypeList || c.Typ != TypeList {
+			joyErr("treegenrec: three quotations expected")
+		}
+		if t.Typ != TypeList {
+			// leaf
+			m.Push(t)
+			m.Execute(o1.List)
+		} else {
+			// branch
+			m.Push(t)
+			m.Execute(o2.List)
+			selfQuot := []Value{o1, o2, c, BuiltinVal("treegenrec", treegenrecFn)}
+			m.Push(ListVal(selfQuot))
+			m.Execute(c.List)
+		}
+	}
+	register("treegenrec", treegenrecFn)
+
+	// some: A [B] -> X — true if any aggregate member satisfies B
+	register("some", func(m *Machine) {
+		m.NeedStack(2, "some")
+		b := m.Pop()
+		a := m.Pop()
+		if b.Typ != TypeList {
+			joyErr("some: quotation expected")
+		}
+		switch a.Typ {
+		case TypeList:
+			for _, item := range a.List {
+				m.Push(item)
+				m.Execute(b.List)
+				if m.Pop().IsTruthy() {
+					m.Push(BoolVal(true))
+					return
+				}
+			}
+		case TypeString:
+			for _, ch := range a.Str {
+				m.Push(CharVal(int64(ch)))
+				m.Execute(b.List)
+				if m.Pop().IsTruthy() {
+					m.Push(BoolVal(true))
+					return
+				}
+			}
+		case TypeSet:
+			for i := 0; i < SetSize; i++ {
+				if a.Int&(1<<i) != 0 {
+					m.Push(IntVal(int64(i)))
+					m.Execute(b.List)
+					if m.Pop().IsTruthy() {
+						m.Push(BoolVal(true))
+						return
+					}
+				}
+			}
+		default:
+			joyErr("some: aggregate expected")
+		}
+		m.Push(BoolVal(false))
+	})
+
+	// all: A [B] -> X — true if all aggregate members satisfy B
+	register("all", func(m *Machine) {
+		m.NeedStack(2, "all")
+		b := m.Pop()
+		a := m.Pop()
+		if b.Typ != TypeList {
+			joyErr("all: quotation expected")
+		}
+		switch a.Typ {
+		case TypeList:
+			for _, item := range a.List {
+				m.Push(item)
+				m.Execute(b.List)
+				if !m.Pop().IsTruthy() {
+					m.Push(BoolVal(false))
+					return
+				}
+			}
+		case TypeString:
+			for _, ch := range a.Str {
+				m.Push(CharVal(int64(ch)))
+				m.Execute(b.List)
+				if !m.Pop().IsTruthy() {
+					m.Push(BoolVal(false))
+					return
+				}
+			}
+		case TypeSet:
+			for i := 0; i < SetSize; i++ {
+				if a.Int&(1<<i) != 0 {
+					m.Push(IntVal(int64(i)))
+					m.Execute(b.List)
+					if !m.Pop().IsTruthy() {
+						m.Push(BoolVal(false))
+						return
+					}
+				}
+			}
+		default:
+			joyErr("all: aggregate expected")
+		}
+		m.Push(BoolVal(true))
+	})
+
 	// while: [B] [P] -> ... — while B is true, execute P
 	register("while", func(m *Machine) {
 		m.NeedStack(2, "while")
@@ -528,4 +669,31 @@ func init() {
 			m.Execute(body.List)
 		}
 	})
+}
+
+func treestepAux(m *Machine, t Value, p []Value) {
+	if t.Typ != TypeList {
+		// leaf
+		m.Push(t)
+		m.Execute(p)
+	} else {
+		// branch — recurse on each child
+		for _, child := range t.List {
+			treestepAux(m, child, p)
+		}
+	}
+}
+
+func treerecAux(m *Machine, t Value, o, c []Value) {
+	if t.Typ != TypeList {
+		// leaf
+		m.Push(t)
+		m.Execute(o)
+	} else {
+		// branch — recurse on each child, then combine
+		for _, child := range t.List {
+			treerecAux(m, child, o, c)
+		}
+		m.Execute(c)
+	}
 }
