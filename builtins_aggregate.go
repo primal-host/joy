@@ -1,6 +1,7 @@
 package main
 
 import (
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -542,6 +543,29 @@ func init() {
 			n = n*b + digit
 		}
 		m.Push(IntVal(n))
+	})
+
+	// sort: A -> B — sort list by Value.Compare or string by rune
+	register("sort", func(m *Machine) {
+		m.NeedStack(1, "sort")
+		a := m.Pop()
+		switch a.Typ {
+		case TypeList:
+			sorted := make([]Value, len(a.List))
+			copy(sorted, a.List)
+			sort.Slice(sorted, func(i, j int) bool {
+				return sorted[i].Compare(sorted[j]) < 0
+			})
+			m.Push(ListVal(sorted))
+		case TypeString:
+			runes := []rune(a.Str)
+			sort.Slice(runes, func(i, j int) bool {
+				return runes[i] < runes[j]
+			})
+			m.Push(StringVal(string(runes)))
+		default:
+			joyErr("sort: list or string expected")
+		}
 	})
 
 	register("strtod", func(m *Machine) {
