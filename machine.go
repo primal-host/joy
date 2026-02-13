@@ -116,10 +116,20 @@ func (m *Machine) RunSafe(program []Value) (err error) {
 }
 
 // RunLine parses and executes a single line of Joy source.
-func (m *Machine) RunLine(line string) error {
+func (m *Machine) RunLine(line string) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			if je, ok := r.(JoyError); ok {
+				err = je
+			} else {
+				err = fmt.Errorf("%v", r)
+			}
+		}
+	}()
 	tokens := NewScanner(line).ScanAll()
 	program := NewParser(tokens, m).Parse()
-	return m.RunSafe(program)
+	m.Execute(program)
+	return nil
 }
 
 // RunSource parses and executes a complete Joy source string.

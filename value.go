@@ -262,6 +262,7 @@ func (v Value) String() string {
 
 type JoyError struct {
 	Msg string
+	Col int // 1-indexed column (0 = unknown)
 }
 
 func (e JoyError) Error() string {
@@ -270,4 +271,8 @@ func (e JoyError) Error() string {
 
 func joyErr(format string, args ...any) {
 	panic(JoyError{Msg: fmt.Sprintf(format, args...)})
+}
+
+func joyErrAt(col int, format string, args ...any) {
+	panic(JoyError{Msg: fmt.Sprintf(format, args...), Col: col})
 }

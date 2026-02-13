@@ -34,6 +34,7 @@ type Token struct {
 	Str string  // raw text for atoms, string value for strings
 	Int int64   // integer or char value
 	Flt float64 // float value
+	Col int     // 1-indexed column in source (0 = unknown)
 }
 
 type Scanner struct {
@@ -164,24 +165,25 @@ func (s *Scanner) ScanAll() []Token {
 func (s *Scanner) Next() Token {
 	s.skipWhitespaceAndComments()
 	if s.atEnd() {
-		return Token{Typ: TokEOF}
+		return Token{Typ: TokEOF, Col: s.pos + 1}
 	}
 
+	col := s.pos + 1 // 1-indexed column
 	ch := s.peek()
 
 	switch ch {
 	case '[':
 		s.advance()
-		return Token{Typ: TokLBrack, Str: "["}
+		return Token{Typ: TokLBrack, Str: "[", Col: col}
 	case ']':
 		s.advance()
-		return Token{Typ: TokRBrack, Str: "]"}
+		return Token{Typ: TokRBrack, Str: "]", Col: col}
 	case '{':
 		s.advance()
-		return Token{Typ: TokLBrace, Str: "{"}
+		return Token{Typ: TokLBrace, Str: "{", Col: col}
 	case '}':
 		s.advance()
-		return Token{Typ: TokRBrace, Str: "}"}
+		return Token{Typ: TokRBrace, Str: "}", Col: col}
 	case '.':
 		s.advance()
 		// .s and similar: dot followed by letter is an atom
@@ -191,12 +193,12 @@ func (s *Scanner) Next() Token {
 				s.advance()
 			}
 			name := "." + string(s.src[start:s.pos])
-			return Token{Typ: TokAtom, Str: name}
+			return Token{Typ: TokAtom, Str: name, Col: col}
 		}
-		return Token{Typ: TokDot, Str: "."}
+		return Token{Typ: TokDot, Str: ".", Col: col}
 	case ';':
 		s.advance()
-		return Token{Typ: TokSemiCol, Str: ";"}
+		return Token{Typ: TokSemiCol, Str: ";", Col: col}
 	case '\'':
 		s.advance()
 		if s.atEnd() {
@@ -209,7 +211,7 @@ func (s *Scanner) Next() Token {
 		} else {
 			c = s.advance()
 		}
-		return Token{Typ: TokChar, Int: int64(c)}
+		return Token{Typ: TokChar, Int: int64(c), Col: col}
 	case '"':
 		s.advance()
 		var buf strings.Builder
@@ -224,7 +226,7 @@ func (s *Scanner) Next() Token {
 		if !s.atEnd() {
 			s.advance() // closing "
 		}
-		return Token{Typ: TokString, Str: buf.String()}
+		return Token{Typ: TokString, Str: buf.String(), Col: col}
 	}
 
 	// numbers: optional leading minus followed by digits
@@ -237,6 +239,7 @@ func (s *Scanner) Next() Token {
 }
 
 func (s *Scanner) scanNumber() Token {
+	col := s.pos + 1
 	start := s.pos
 	if s.peek() == '-' {
 		s.advance()
@@ -268,16 +271,17 @@ func (s *Scanner) scanNumber() Token {
 		if err != nil {
 			joyErr("invalid float: %s", text)
 		}
-		return Token{Typ: TokFloat, Flt: f, Str: text}
+		return Token{Typ: TokFloat, Flt: f, Str: text, Col: col}
 	}
 	n, err := strconv.ParseInt(text, 10, 64)
 	if err != nil {
 		joyErr("invalid integer: %s", text)
 	}
-	return Token{Typ: TokInt, Int: n, Str: text}
+	return Token{Typ: TokInt, Int: n, Str: text, Col: col}
 }
 
 func (s *Scanner) scanAtom() Token {
+	col := s.pos + 1
 	start := s.pos
 	for !s.atEnd() && isAtomChar(s.peek()) {
 		// Only include '.' if followed by another atom char (module dot-notation: m1.ab)
@@ -296,18 +300,18 @@ func (s *Scanner) scanAtom() Token {
 	}
 	switch text {
 	case "DEFINE", "PUBLIC", "LIBRA":
-		return Token{Typ: TokDefine, Str: text}
+		return Token{Typ: TokDefine, Str: text, Col: col}
 	case "HIDE", "PRIVATE":
-		return Token{Typ: TokHide, Str: text}
+		return Token{Typ: TokHide, Str: text, Col: col}
 	case "IN":
-		return Token{Typ: TokIn, Str: text}
+		return Token{Typ: TokIn, Str: text, Col: col}
 	case "END":
-		return Token{Typ: TokEnd, Str: text}
+		return Token{Typ: TokEnd, Str: text, Col: col}
 	case "MODULE":
-		return Token{Typ: TokModule, Str: text}
+		return Token{Typ: TokModule, Str: text, Col: col}
 	case "==":
-		return Token{Typ: TokEqDef, Str: text}
+		return Token{Typ: TokEqDef, Str: text, Col: col}
 	default:
-		return Token{Typ: TokAtom, Str: text}
+		return Token{Typ: TokAtom, Str: text, Col: col}
 	}
 }

@@ -78,7 +78,6 @@ func replReadline(m *Machine) {
 		HistorySearchFold: true,
 	})
 	if err != nil {
-		// Fall back to pipe mode
 		replPipe(m)
 		return
 	}
@@ -97,7 +96,7 @@ func replReadline(m *Machine) {
 			fmt.Println(line)
 		}
 		if err := m.RunLine(line); err != nil {
-			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			reportError(err)
 		} else if m.Autoput == 1 && len(m.Stack) > 0 {
 			fmt.Println(m.Stack[len(m.Stack)-1].String())
 		} else if m.Autoput == 2 && len(m.Stack) > 0 {
@@ -122,7 +121,7 @@ func replPipe(m *Machine) {
 			fmt.Println(line)
 		}
 		if err := m.RunLine(line); err != nil {
-			fmt.Fprintf(os.Stderr, "error: %v\n", err)
+			reportError(err)
 		} else if m.Autoput == 1 && len(m.Stack) > 0 {
 			fmt.Println(m.Stack[len(m.Stack)-1].String())
 		} else if m.Autoput == 2 && len(m.Stack) > 0 {
@@ -130,4 +129,12 @@ func replPipe(m *Machine) {
 		}
 	}
 	fmt.Println()
+}
+
+func reportError(err error) {
+	if je, ok := err.(JoyError); ok && je.Col > 0 {
+		fmt.Fprintf(os.Stderr, "error at col %d: %s\n", je.Col, je.Msg)
+	} else {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+	}
 }

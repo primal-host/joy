@@ -89,11 +89,11 @@ func (p *Parser) parseDefine() {
 		}
 		// expect: name == body ;|.
 		if p.peek().Typ != TokAtom {
-			joyErr("expected atom in DEFINE, got %s", p.peek().Str)
+			joyErrAt(p.peek().Col, "expected atom in DEFINE, got %s", p.peek().Str)
 		}
 		name := p.advance().Str
 		if p.peek().Typ != TokEqDef {
-			joyErr("expected == after %s in DEFINE", name)
+			joyErrAt(p.peek().Col, "expected == after %s in DEFINE", name)
 		}
 		p.advance() // consume ==
 		body := p.readBody()
@@ -120,7 +120,7 @@ func (p *Parser) parseHide() {
 	if !p.atEnd() && p.peek().Typ == TokIn {
 		p.advance() // consume IN
 	} else {
-		joyErr("expected IN after HIDE definitions")
+		joyErrAt(p.peek().Col, "expected IN after HIDE definitions")
 	}
 
 	// Parse public definitions until END.
@@ -131,7 +131,7 @@ func (p *Parser) parseHide() {
 	if !p.atEnd() && p.peek().Typ == TokEnd {
 		p.advance() // consume END
 	} else {
-		joyErr("expected END after IN definitions")
+		joyErrAt(p.peek().Col, "expected END after IN definitions")
 	}
 
 	p.popScope()
@@ -142,7 +142,7 @@ func (p *Parser) parseHide() {
 func (p *Parser) parseModule() {
 	p.advance() // consume MODULE
 	if p.atEnd() || p.peek().Typ != TokAtom {
-		joyErr("expected module name after MODULE")
+		joyErrAt(p.peek().Col, "expected module name after MODULE")
 	}
 	modName := p.advance().Str
 
@@ -159,7 +159,7 @@ func (p *Parser) parseModule() {
 	if !p.atEnd() && p.peek().Typ == TokHide {
 		p.advance()
 	} else {
-		joyErr("expected PRIVATE after MODULE %s", modName)
+		joyErrAt(p.peek().Col, "expected PRIVATE after MODULE %s", modName)
 	}
 
 	// Parse private definitions — stop at PUBLIC (TokDefine) or IN or END
@@ -173,11 +173,11 @@ func (p *Parser) parseModule() {
 			continue
 		}
 		if tok.Typ != TokAtom {
-			joyErr("expected atom in MODULE PRIVATE, got %s", tok.Str)
+			joyErrAt(tok.Col, "expected atom in MODULE PRIVATE, got %s", tok.Str)
 		}
 		name := p.advance().Str
 		if p.peek().Typ != TokEqDef {
-			joyErr("expected == after %s", name)
+			joyErrAt(p.peek().Col, "expected == after %s", name)
 		}
 		p.advance()
 
@@ -196,7 +196,7 @@ func (p *Parser) parseModule() {
 	if !p.atEnd() && (p.peek().Typ == TokDefine || p.peek().Typ == TokIn) {
 		p.advance()
 	} else {
-		joyErr("expected PUBLIC after MODULE %s PRIVATE definitions", modName)
+		joyErrAt(p.peek().Col, "expected PUBLIC after MODULE %s PRIVATE definitions", modName)
 	}
 
 	// Parse public definitions — store as moduleName.fieldName
@@ -206,7 +206,7 @@ func (p *Parser) parseModule() {
 	if !p.atEnd() && p.peek().Typ == TokEnd {
 		p.advance()
 	} else {
-		joyErr("expected END for MODULE %s", modName)
+		joyErrAt(p.peek().Col, "expected END for MODULE %s", modName)
 	}
 
 	// Restore module context and pop scope
@@ -278,11 +278,11 @@ func (p *Parser) parseDefSequence(prefix string) {
 			continue
 		}
 		if tok.Typ != TokAtom {
-			joyErr("expected atom in definition, got %s", tok.Str)
+			joyErrAt(tok.Col, "expected atom in definition, got %s", tok.Str)
 		}
 		name := p.advance().Str
 		if p.peek().Typ != TokEqDef {
-			joyErr("expected == after %s", name)
+			joyErrAt(p.peek().Col, "expected == after %s", name)
 		}
 		p.advance() // consume ==
 
@@ -356,7 +356,7 @@ func (p *Parser) parseTerm() []Value {
 		return nil
 	default:
 		p.advance()
-		joyErr("unexpected token: %s", tok.Str)
+		joyErrAt(tok.Col, "unexpected token: %s", tok.Str)
 		return nil
 	}
 }
@@ -388,11 +388,11 @@ func (p *Parser) parseSet() Value {
 		case TokChar:
 			n = tok.Int
 		default:
-			joyErr("set members must be small integers or characters, got %s", tok.Str)
+			joyErrAt(tok.Col, "set members must be small integers or characters, got %s", tok.Str)
 			continue
 		}
 		if n < 0 || n >= SetSize {
-			joyErr("set member %d out of range 0..%d", n, SetSize-1)
+			joyErrAt(tok.Col, "set member %d out of range 0..%d", n, SetSize-1)
 		}
 		bits |= 1 << n
 	}
