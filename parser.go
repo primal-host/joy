@@ -144,14 +144,15 @@ func (p *Parser) parseDefSequence(prefix string) {
 			joyErr("expected == after %s", name)
 		}
 		p.advance() // consume ==
-		body := p.readBody()
 
+		// Register in scope BEFORE parsing body (enables recursive self-references)
 		dictName := name
 		if prefix != "" {
 			dictName = prefix + name
-			// Register in current scope map
 			p.scopes[len(p.scopes)-1][name] = dictName
 		}
+
+		body := p.readBody()
 		p.machine.Dict[dictName] = body
 
 		// consume optional ;

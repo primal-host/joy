@@ -1,0 +1,67 @@
+(* numlib.joy — Numerical library *)
+(* Adapted from the C reference implementation *)
+(* Requires: inilib *)
+
+(* ===== Predicates ===== *)
+DEFINE
+  positive == 0 > ;
+  negative == 0 < ;
+  even     == 2 rem 0 = ;
+  odd      == even not .
+
+(* ===== Stack helper ===== *)
+DEFINE
+  over == [dup] dip swap .   (* X Y -> X Y X *)
+
+(* ===== Primality ===== *)
+HIDE
+  trial ==  (* N D -> bool — trial division by odd numbers *)
+    over over dup * <
+    [pop pop true]
+    [over over rem 0 =
+     [pop pop false]
+     [2 + trial]
+     branch]
+    branch
+IN
+  prime ==  (* N -> bool *)
+    [2 <]  [pop false]
+    [[2 =]  [pop true]
+     [[even] [pop false]
+      [3 trial]
+      ifte]
+     ifte]
+    ifte
+END
+
+(* ===== Basic functions ===== *)
+DEFINE
+  fact == (* N -> N! *)
+    [0 =] [pop 1] [dup pred fact *] ifte ;
+  fib  == (* N -> fib(N) *)
+    [small] [] [pred dup pred] [+] binrec ;
+  gcd  == (* I J -> K — greatest common divisor *)
+    [0 =] [pop] [dup rollup rem] tailrec .
+
+(* ===== Temperature ===== *)
+DEFINE
+  fahrenheit == 9 * 5 / 32 + ;
+  celsius    == 32 - 5 * 9 / .
+
+(* ===== Constants ===== *)
+DEFINE
+  pi      == 3.14159265358979323 ;
+  e-const == 2.71828182845904523 .
+
+(* ===== Trig in degrees ===== *)
+DEFINE
+  radians == 180.0 / pi * ;
+  sindeg  == radians sin ;
+  cosdeg  == radians cos ;
+  tandeg  == radians tan .
+
+(* ===== Calculus — numerical derivative ===== *)
+DEFINE
+  deriv == (* X [F] -> D *)
+    swap dup 1.0e-8 + rolldown
+    unary2 swap - 1.0e-8 / .
