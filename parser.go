@@ -58,6 +58,8 @@ func (p *Parser) Parse() []Value {
 			p.parseHide()
 		case TokModule:
 			p.parseModule()
+		case TokSemiCol:
+			p.advance() // skip stray semicolons (e.g. after END;)
 		default:
 			program = append(program, p.parseTerm()...)
 		}

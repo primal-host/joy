@@ -1,0 +1,190 @@
+(* grmlib.joy — Grammar generating and parsing library *)
+(* Adapted from the C reference implementation *)
+(* Uses Min2Tre translator from symlib *)
+"symlib" libload
+
+LIBRA
+
+    _grmlib == true;
+
+(* define the operators used by regular expressions and grammars *)
+    unops == [? * + $];
+    binops == [| _];
+    bin1ops == [|];
+    bin2ops == [_];
+    bin3ops == [];
+
+(* - - - - -              G E N E R A T I N G                  - - - - - *)
+
+HIDE
+
+    show-put ==
+        pop put newline pop;
+    show-put-step ==
+        pop [put] step newline pop;
+    show-putchars-step ==
+        pop [putchars] step newline pop;
+    show-putchars-sp-step ==
+        pop [putchars space] step newline pop;
+
+    accumulate ==
+        pop popd swons
+
+IN
+
+    generate ==
+      [ pop pop size <= ]
+      [ pop pop pop pop ]
+      [
+        unswons
+        [ [ [[ | ] in]
+            pop
+            [ [] cons cons cons dup ] dip
+            uncons first
+            [ swap
+              [[i] dip generate] dip ]
+            dip
+            [i] dip generate ]
+          [ [[ _ ] in ]
+            pop uncons first
+            [ [generate] cons swons ]
+            dip generate ]
+          [ [[ ? ] in ]
+            pop
+            [ [] cons cons cons dup
+              [i unswons i] dip ]
+            dip
+            [i] dip first generate ]
+          [ [[ + ] in ]
+            swons
+            [] cons cons cons cons dup
+            [ i second generate ] dip
+            i dup
+            [ [generate] cons swons ] dip
+            second generate ]
+          [ [[ * ] in ]
+            swons
+            [ [] cons cons cons dup
+              [i unswons i] dip ]
+            dip
+            dup
+            [ [i] dip [generate] cons swons ] dip
+            second generate ]
+          [ [[ $ ] in]
+            pop first i
+            Min2Tre generate ]
+          [ [[QUOTE] in ]
+            pop first
+            swap [swons] dip
+            unswons i ]
+          [ [[epsilon] in ]
+            pop pop
+            unswons i ]
+          [ popd
+            swap [swons] dip
+            unswons i ] ]
+        cond
+      ]
+      ifte;
+
+    gen-trace-default == putchars " : " putchars stack putln;
+    gen-trace == pop;
+
+    gen-put ==
+        Min2Tre [ [] [[show-put]] ] dip generate;
+    gen-put-step ==
+        Min2Tre [ [] [[show-put-step]] ] dip generate;
+    gen-putchars-step ==
+        Min2Tre [ [] [[show-putchars-step]] ] dip generate;
+    gen-putchars-sp-step ==
+        Min2Tre [ [] [[show-putchars-sp-step]] ] dip generate;
+
+    gen-accumulate ==
+        Min2Tre [ [[]] dip [] [[accumulate]] ] dip generate
+
+END;
+
+(* - - - - -               P A R S I N G                      - - - - - *)
+
+HIDE
+
+    parse-string-residues ==
+        pop [ succ dup put ": " putchars ] dip [putch] step newline;
+    parse-list-residues ==
+        pop [ succ dup put ": " putchars ] dip [put] step newline;
+    parse-test == pop pop true or;
+    parse-count ==
+        pop pop succ;
+    parse-tell == "accept\n" putchars pop pop succ;
+
+    prs-trace == pop
+
+IN
+
+    parse ==
+        "parse B" prs-trace
+        unswons
+        [ [ [[ | ] in]
+            pop
+            [ [] cons cons dup ] dip
+            uncons first
+            [ swap
+              [[i] dip parse] dip ]
+            dip
+            [i] dip parse ]
+          [ [[ _ ] in ]
+            pop uncons first swap
+            [ [parse] cons swons ]
+            dip parse ]
+          [ [[ ? ] in ]
+            pop
+            [ [] cons cons dup
+              [i unswons i] dip ]
+            dip
+            [i] dip first parse ]
+          [ [[ + ] in ]
+            swons
+            [] cons cons cons dup
+            [ i second parse ] dip
+            i dup
+            [ [parse] cons swons ] dip
+            second parse ]
+          [ [[ * ] in ]
+            swons
+            [ [] cons cons dup
+              [i unswons i] dip ]
+            dip
+            dup
+            [ [i] dip [parse] cons swons ] dip
+            second parse ]
+          [ [[ $ ] in]
+            pop first i
+            Min2Tre parse ]
+          [ [[QUOTE] in ]
+            pop first
+            swap [swons] dip
+            unswons i ]
+          [ [[epsilon] in ]
+            pop pop
+            unswons i ]
+          [ popd
+            [ [pop first] dip = ]
+            [ pop [rest] dip unswons i ]
+            [ pop pop pop ]
+            ifte ] ]
+        cond
+        "parse E" prs-trace
+      ;
+
+    prs-test ==
+        Min2Tre [ [false] dip [[parse-test]] ] dip parse;
+    prs-string-residues ==
+        Min2Tre [ [0] dip [[parse-string-residues]] ] dip parse pop;
+    prs-list-residues ==
+        Min2Tre [ [0] dip [[parse-list-residues]] ] dip parse pop;
+    prs-count ==
+        Min2Tre [ [0] dip [[parse-count]] ] dip parse
+
+END;
+
+    GRMLIB == "grmlib.joy - grammar (generating/parsing) library\n" .
