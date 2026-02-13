@@ -3,20 +3,24 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 )
 
 type Machine struct {
-	Stack   []Value
-	Dict    map[string][]Value
-	Autoput int // 0=off, 1=. (print top), 2=.. (print stack)
-	ScopeID int // counter for HIDE/IN/END scope name mangling
+	Stack    []Value
+	Dict     map[string][]Value
+	Autoput  int              // 0=off, 1=. (print top), 2=.. (print stack)
+	ScopeID  int              // counter for HIDE/IN/END scope name mangling
+	LibPaths []string         // search directories for .joy files
+	Included map[string]bool  // include guard (resolved path → loaded)
 }
 
 func NewMachine() *Machine {
 	return &Machine{
-		Stack: nil,
-		Dict:  make(map[string][]Value),
+		Stack:    nil,
+		Dict:     make(map[string][]Value),
+		Included: make(map[string]bool),
 	}
 }
 
@@ -92,12 +96,53 @@ func (m *Machine) RunSource(source string) error {
 	return m.RunLine(source)
 }
 
-// RunFile reads and executes a Joy source file.
-func (m *Machine) RunFile(path string) error {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return fmt.Errorf("cannot read %s: %w", path, err)
+// ReadFile searches for a Joy source file and returns its contents.
+// Search order: absolute/relative path, current dir, LibPaths, embedded FS.
+func (m *Machine) ReadFile(name string) ([]byte, string, error) {
+	// Absolute or relative path — try directly
+	if filepath.IsAbs(name) || strings.HasPrefix(name, ".") {
+		data, err := os.ReadFile(name)
+		if err == nil {
+			abs, _ := filepath.Abs(name)
+			return data, abs, nil
+		}
+		return nil, "", fmt.Errorf("cannot read %s: %w", name, err)
 	}
+
+	// Try current directory
+	if data, err := os.ReadFile(name); err == nil {
+		abs, _ := filepath.Abs(name)
+		return data, abs, nil
+	}
+
+	// Try LibPaths
+	for _, dir := range m.LibPaths {
+		full := filepath.Join(dir, name)
+		if data, err := os.ReadFile(full); err == nil {
+			abs, _ := filepath.Abs(full)
+			return data, abs, nil
+		}
+	}
+
+	// Try embedded FS
+	data, err := readEmbeddedLib(name)
+	if err == nil {
+		return data, "embedded:" + name, nil
+	}
+
+	return nil, "", fmt.Errorf("cannot find %s", name)
+}
+
+// RunFile reads and executes a Joy source file with include guard.
+func (m *Machine) RunFile(path string) error {
+	data, resolved, err := m.ReadFile(path)
+	if err != nil {
+		return err
+	}
+	if m.Included[resolved] {
+		return nil // already included
+	}
+	m.Included[resolved] = true
 	return m.RunSource(string(data))
 }
 
