@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -14,6 +15,7 @@ type Machine struct {
 	ScopeID  int              // counter for HIDE/IN/END scope name mangling
 	LibPaths []string         // search directories for .joy files
 	Included map[string]bool  // include guard (resolved path → loaded)
+	Input    *bufio.Scanner   // input scanner for get builtin
 }
 
 func NewMachine() *Machine {

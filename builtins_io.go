@@ -49,9 +49,20 @@ func init() {
 		fmt.Println()
 	})
 
-	// get: read a line from stdin (placeholder — real input in REPL)
+	// get: -> X — read a line from stdin, parse as Joy, push result
 	register("get", func(m *Machine) {
-		// In batch mode, push an empty list as placeholder
-		m.Push(ListVal([]Value{}))
+		if m.Input == nil {
+			joyErr("get: no input source available")
+		}
+		if !m.Input.Scan() {
+			joyErr("get: end of input")
+		}
+		line := m.Input.Text()
+		tokens := NewScanner(line).ScanAll()
+		program := NewParser(tokens, m).Parse()
+		// Push each parsed value onto the stack
+		for _, v := range program {
+			m.Push(v)
+		}
 	})
 }

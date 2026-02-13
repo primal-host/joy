@@ -10,6 +10,7 @@ import (
 
 func main() {
 	m := NewMachine()
+	m.Input = bufio.NewScanner(os.Stdin)
 
 	// Set up library paths
 	// 1. Exe-relative lib/ directory
