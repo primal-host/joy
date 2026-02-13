@@ -262,4 +262,35 @@ func init() {
 	register("stderr", func(m *Machine) {
 		m.Push(FileVal(os.Stderr, "stderr"))
 	})
+
+	// include: S -> — load and execute a Joy source file
+	register("include", func(m *Machine) {
+		m.NeedStack(1, "include")
+		a := m.Pop()
+		if a.Typ != TypeString {
+			joyErr("include: string expected")
+		}
+		if err := m.RunFile(a.Str); err != nil {
+			joyErr("include: %v", err)
+		}
+	})
+
+	// formatf: F C I J -> S — format float F in mode C with width I, precision J
+	// C is a char: 'f (fixed), 'e (scientific), 'g (general)
+	register("formatf", func(m *Machine) {
+		m.NeedStack(4, "formatf")
+		prec := m.Pop()
+		width := m.Pop()
+		mode := m.Pop()
+		f := m.Pop()
+		verb := 'g'
+		if mode.Typ == TypeChar || mode.Typ == TypeInteger {
+			switch rune(mode.Int) {
+			case 'f', 'e', 'g':
+				verb = rune(mode.Int)
+			}
+		}
+		fmtStr := fmt.Sprintf("%%%d.%d%c", width.Int, prec.Int, verb)
+		m.Push(StringVal(fmt.Sprintf(fmtStr, f.NumericVal())))
+	})
 }
