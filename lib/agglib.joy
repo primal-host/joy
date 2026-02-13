@@ -37,8 +37,9 @@ DEFINE
 DEFINE
   null2    == nulld null ;
   cons2    == swapd cons [cons] dip ;
+  uncons2  == unconsd uncons swapd ;
   swons2   == swapd swons [swons] dip ;
-  unswons2 == unswonsd unswons .
+  unswons2 == unswonsd unswons swapd .
 
 (* ===== Range generators ===== *)
 DEFINE
