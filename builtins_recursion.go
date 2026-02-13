@@ -96,6 +96,67 @@ func init() {
 		condlinrecAux(m, clauses.List)
 	})
 
+	// primrec: X [I] [C] primrec — primitive recursion
+	// Decompose X into constituents, execute I (initial), then C for each.
+	register("primrec", func(m *Machine) {
+		m.NeedStack(3, "primrec")
+		c := m.Pop()
+		i := m.Pop()
+		x := m.Pop()
+		if i.Typ != TypeList || c.Typ != TypeList {
+			joyErr("primrec: two quotations expected")
+		}
+		switch x.Typ {
+		case TypeInteger:
+			// Push x, x-1, ..., 1
+			n := x.Int
+			if n < 0 {
+				joyErr("primrec: non-negative integer expected")
+			}
+			for k := n; k >= 1; k-- {
+				m.Push(IntVal(k))
+			}
+			m.Execute(i.List)
+			for k := int64(0); k < n; k++ {
+				m.Execute(c.List)
+			}
+		case TypeList:
+			// Push each element (first to last)
+			for idx := len(x.List) - 1; idx >= 0; idx-- {
+				m.Push(x.List[idx])
+			}
+			m.Execute(i.List)
+			for range x.List {
+				m.Execute(c.List)
+			}
+		case TypeString:
+			runes := []rune(x.Str)
+			for idx := len(runes) - 1; idx >= 0; idx-- {
+				m.Push(CharVal(int64(runes[idx])))
+			}
+			m.Execute(i.List)
+			for range runes {
+				m.Execute(c.List)
+			}
+		case TypeSet:
+			var members []int
+			for bit := 0; bit < SetSize; bit++ {
+				if x.Int&(1<<bit) != 0 {
+					members = append(members, bit)
+				}
+			}
+			for idx := len(members) - 1; idx >= 0; idx-- {
+				m.Push(IntVal(int64(members[idx])))
+			}
+			m.Execute(i.List)
+			for range members {
+				m.Execute(c.List)
+			}
+		default:
+			joyErr("primrec: aggregate or integer expected")
+		}
+	})
+
 	// condnestrec: [[C1 R1 R2 ...] [C2 ...] ... [D ...]] condnestrec
 	// Conditional nested recursion.
 	register("condnestrec", func(m *Machine) {
