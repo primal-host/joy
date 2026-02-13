@@ -1,0 +1,37 @@
+(* fraclib.joy — Mandelbrot fractal generator *)
+(* Nick Forde, March 2002 *)
+(* Requires: seqlib *)
+"seqlib" libload
+
+LIBRA
+
+  nrows  == 30;
+  ncols  == 75;
+  mandel == -1 nrows ncols *
+            [ succ dup dup [col] dip row
+              get_c1 swap get_c2
+              get_k putpt
+              [eol] ['\n putch] [] ifte
+            ] times;
+  row    == ncols /;
+  col    == ncols rem;
+  eol    == col ncols pred =;
+  putpt  == 16 rem " .:,;!/>)|&IH%*#" of putch;
+  get_k  == pairlist [0 0] swoncat
+            0 [112 <= [eoloop] dip and]
+            [succ [inc_zs] dip] while
+            popd 1 -;
+  get_c1 == 0.10 * 1.5 -;
+  get_c2 == 0.04 * 2.0 -;
+  sqr_z1 == first dup *;
+  sqr_z2 == 1 at  dup *;
+  inc_z1 == dup [sqr_z1] [sqr_z2] cleave -
+            [3 at] dip +;
+  inc_z2 == 3 take reverse uncons uncons
+            uncons pop
+            2 * * + ;
+  eoloop == dup sqr_z1 swap sqr_z2 + 10 <=;
+  inc_zs == dup [inc_z1] [inc_z2] cleave
+            pairlist swap rest rest concat;
+
+  FRACLIB == "fraclib.joy - fractal library\n" .
