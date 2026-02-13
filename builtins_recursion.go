@@ -246,7 +246,7 @@ func condlinrecAux(m *Machine, clauses []Value) {
 			}
 			if len(clause.List) > 1 {
 				post := clause.List[1]
-				if post.Typ == TypeList && len(post.List) > 0 {
+				if post.Typ == TypeList {
 					condlinrecAux(m, clauses)
 					m.Execute(post.List)
 				}
