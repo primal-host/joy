@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"sort"
 	"strconv"
 	"strings"
@@ -509,12 +510,48 @@ func init() {
 		}
 	})
 
+	// format: X C I J -> S — C-style formatted output
+	// C = char specifier: 'd (decimal), 'o (octal), 'x (hex),
+	//   'f (fixed float), 'e (scientific), 'g (general float), 's (string)
+	// I = minimum field width, J = precision (floats) or max width (strings)
 	register("format", func(m *Machine) {
-		m.NeedStack(2, "format")
-		_factor := m.Pop() // ignored for basic formatting
-		a := m.Pop()
-		_ = _factor
-		m.Push(StringVal(a.String()))
+		m.NeedStack(4, "format")
+		j := m.Pop() // precision / max width
+		i := m.Pop() // field width
+		c := m.Pop() // format char
+		x := m.Pop() // value
+
+		width := int(i.Int)
+		prec := int(j.Int)
+		ch := rune(c.Int)
+
+		var result string
+		switch ch {
+		case 'd':
+			result = fmt.Sprintf("%*d", width, x.Int)
+		case 'o':
+			result = fmt.Sprintf("%*o", width, x.Int)
+		case 'x':
+			result = fmt.Sprintf("%*x", width, x.Int)
+		case 'f':
+			result = fmt.Sprintf("%*.*f", width, prec, x.NumericVal())
+		case 'e':
+			result = fmt.Sprintf("%*.*e", width, prec, x.NumericVal())
+		case 'g':
+			result = fmt.Sprintf("%*.*g", width, prec, x.NumericVal())
+		case 's':
+			s := x.String()
+			if x.Typ == TypeString {
+				s = x.Str // raw string without quotes
+			}
+			if prec > 0 && len(s) > prec {
+				s = s[:prec]
+			}
+			result = fmt.Sprintf("%*s", width, s)
+		default:
+			result = x.String()
+		}
+		m.Push(StringVal(result))
 	})
 
 	register("strtol", func(m *Machine) {
